@@ -1,0 +1,12 @@
+[package]
+name = "modinverse"
+version = "0.1.0"
+authors = ["Simon Andrews <simon.andrews212@gmail.com>"]
+
+description = "Small library for finding the modular multiplicative inverses."
+repository = "https://github.com/simon-andrews/rust-modinverse"
+readme = "README.md"
+license = "Unlicense"
+
+[dependencies]
+num-integer = "*"
