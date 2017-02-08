@@ -9,4 +9,4 @@ readme = "README.md"
 license = "Unlicense"
 
 [dependencies]
-num-integer = "*"
+num-integer = "0.1.32"
