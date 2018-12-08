@@ -1,6 +1,6 @@
 [package]
 name = "modinverse"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Simon Andrews <simon.andrews212@gmail.com>"]
 
 description = "Small library for finding the modular multiplicative inverses."
@@ -9,4 +9,4 @@ readme = "README.md"
 license = "Unlicense"
 
 [dependencies]
-num-integer = "0.1.32"
+num-integer = "0.1"
