@@ -20,10 +20,10 @@ use num_integer::Integer;
 /// let b = 3;
 /// let (g, x, y) = egcd(a, b);
 ///
-/// assert_eq!(g, 1); // Greatest common denominator
-/// assert_eq!(x, -1); // Bézout coefficient x
-/// assert_eq!(y, 9); // Bézout coefficient y
-/// assert_eq!((a * x) + (b * y), g); // Make sure it all works out according to plan
+/// assert_eq!(g, 1);
+/// assert_eq!(x, -1);
+/// assert_eq!(y, 9);
+/// assert_eq!((a * x) + (b * y), g);
 /// ```
 pub fn egcd<T: Copy + Integer>(a: T, b: T) -> (T, T, T) {
     if a == T::zero() {
