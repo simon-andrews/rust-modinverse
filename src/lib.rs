@@ -58,6 +58,7 @@ pub fn egcd<T: Copy + Integer>(a: T, b: T) -> (T, T, T) {
 ///   None => {},
 /// }
 pub fn modinverse<T: Copy + Integer>(a: T, m: T) -> Option<T> {
+    let a = ((a % m) + m) % m;
     let (g, x, _) = egcd(a, m);
     if g != T::one() {
         None
