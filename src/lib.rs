@@ -80,3 +80,33 @@ pub fn modinverse<T: Clone + Integer>(a: T, m: T) -> Option<T> {
         Some(mod_floor(x, m))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use num_bigint::BigInt;
+
+    #[test]
+    fn modinverse_basic() {
+        assert_eq!(modinverse(3, 26), Some(9));
+        assert_eq!(modinverse(4, 32), None);
+    }
+
+    #[test]
+    fn modinverse_negative_a() {
+        // -3 ≡ 23 (mod 26), and 23 * 17 ≡ 1 (mod 26)
+        assert_eq!(modinverse(-3, 26), Some(17));
+    }
+
+    #[test]
+    fn modinverse_a_larger_than_m() {
+        assert_eq!(modinverse(29, 26), Some(9));
+    }
+
+    #[test]
+    fn modinverse_bigint() {
+        let a = BigInt::from(3);
+        let m = BigInt::from(26);
+        assert_eq!(modinverse(a, m), Some(BigInt::from(9)));
+    }
+}

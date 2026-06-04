@@ -11,3 +11,6 @@ license = "Unlicense"
 
 [dependencies]
 num-integer = "0.1"
+
+[dev-dependencies]
+num-bigint = "0.4.6"
