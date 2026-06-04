@@ -25,14 +25,28 @@ use num_integer::Integer;
 /// assert_eq!(y, 9);
 /// assert_eq!((a * x) + (b * y), g);
 /// ```
-pub fn egcd<T: Copy + Integer>(a: T, b: T) -> (T, T, T) {
-    if a == T::zero() {
+pub fn egcd<T: Clone + Integer>(a: T, b: T) -> (T, T, T) {
+    if a.is_zero() {
         (b, T::zero(), T::one())
+    } else {
+        let (g, x, y) = egcd(b.clone() % a.clone(), a.clone());
+        (g, y - (b / a) * x.clone(), x)
     }
-    else {
-        let (g, x, y) = egcd(b % a, a);
-        (g, y - (b / a) * x, x)
-    }
+}
+
+/// Calculates the floor modulus. This is identical to the remainder for unsigned integers, but is
+/// different for signed values; see https://en.wikipedia.org/wiki/Modulo_operation and
+/// https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/divmodnote-letter.pdf.
+///
+/// ```
+/// use modinverse::mod_floor;
+///
+/// assert_eq!(mod_floor(5, 3), 2);
+/// assert_eq!(mod_floor(-5, 3), 1);
+/// assert_eq!(mod_floor(5, -3), -1);
+/// assert_eq!(mod_floor(-5, -3), -2);
+pub fn mod_floor<T: Clone + Integer>(a: T, m: T) -> T {
+    (a % m.clone() + m.clone()) % m
 }
 
 /// Calculates the [modular multiplicative
@@ -57,12 +71,11 @@ pub fn egcd<T: Copy + Integer>(a: T, b: T) -> (T, T, T) {
 ///   Some(x) => panic!("modinverse() found an inverse when it shouldn't have"),
 ///   None => {},
 /// }
-pub fn modinverse<T: Copy + Integer>(a: T, m: T) -> Option<T> {
-    let (g, x, _) = egcd(a, m);
-    if g != T::one() {
+pub fn modinverse<T: Clone + Integer>(a: T, m: T) -> Option<T> {
+    let (g, x, _) = egcd(a, m.clone());
+    if !g.is_one() {
         None
-    }
-    else {
-        Some((x % m + m) % m)
+    } else {
+        Some(mod_floor(x, m))
     }
 }
