@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Unlicense"
 
 [dependencies]
-num-integer = "0.1"
+num-integer = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 num-bigint = "0.4.6"

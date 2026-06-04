@@ -1,6 +1,8 @@
 //! Small library for finding the modular multiplicative inverses. Also has an implementation of
 //! the extended Euclidean algorithm built in.
 
+#![no_std]
+
 use num_integer::Integer;
 
 /// Finds the greatest common denominator of two integers *a* and *b*, and two
