@@ -2,6 +2,7 @@
 name = "modinverse"
 version = "0.1.1"
 authors = ["Simon Andrews <simon.andrews212@gmail.com>"]
+edition = "2021"
 
 description = "Small library for finding the modular multiplicative inverses."
 repository = "https://github.com/simon-andrews/rust-modinverse"
