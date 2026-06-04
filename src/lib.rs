@@ -72,6 +72,7 @@ pub fn mod_floor<T: Clone + Integer>(a: T, m: T) -> T {
 /// }
 /// ```
 pub fn modinverse<T: Clone + Integer>(a: T, m: T) -> Option<T> {
+    let a = mod_floor(a, m.clone());
     let (g, x, _) = egcd(a, m.clone());
     if !g.is_one() {
         None
