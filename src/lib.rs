@@ -45,6 +45,7 @@ pub fn egcd<T: Clone + Integer>(a: T, b: T) -> (T, T, T) {
 /// assert_eq!(mod_floor(-5, 3), 1);
 /// assert_eq!(mod_floor(5, -3), -1);
 /// assert_eq!(mod_floor(-5, -3), -2);
+/// ```
 pub fn mod_floor<T: Clone + Integer>(a: T, m: T) -> T {
     (a % m.clone() + m.clone()) % m
 }
@@ -71,6 +72,7 @@ pub fn mod_floor<T: Clone + Integer>(a: T, m: T) -> T {
 ///   Some(x) => panic!("modinverse() found an inverse when it shouldn't have"),
 ///   None => {},
 /// }
+/// ```
 pub fn modinverse<T: Clone + Integer>(a: T, m: T) -> Option<T> {
     let (g, x, _) = egcd(a, m.clone());
     if !g.is_one() {
