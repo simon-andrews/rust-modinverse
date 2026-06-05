@@ -1,6 +1,6 @@
 [package]
 name = "modinverse"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Simon Andrews <public@simonandre.ws>"]
 edition = "2021"
 
