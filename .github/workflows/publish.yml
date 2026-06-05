@@ -15,6 +15,6 @@ jobs:
           tag="${GITHUB_REF_NAME#v}"
           grep -q "^version = \"$tag\"\$" Cargo.toml \
             || { echo "tag $tag does not match Cargo.toml"; exit 1; }
-      - run: cargo login ${{ secrets.CRATES_IO }}
-      - run: cargo package
-      - run: cargo publish
+      - env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish
