@@ -97,6 +97,7 @@ pub fn modinverse<T: Clone + Integer + Signed>(a: T, m: T) -> Option<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "bigint")]
     use num_bigint::BigInt;
 
     #[test]
@@ -116,6 +117,7 @@ mod tests {
         assert_eq!(modinverse(29, 26), Some(9));
     }
 
+    #[cfg(feature = "bigint")]
     #[test]
     fn modinverse_bigint() {
         let a = BigInt::from(3);
@@ -123,6 +125,7 @@ mod tests {
         assert_eq!(modinverse(a, m), Some(BigInt::from(9)));
     }
 
+    #[cfg(feature = "bigint")]
     #[test]
     fn egcd_iterative_no_stack_overflow_on_fibonacci_bigints() {
         // egcd's recursive form blew the stack on adversarial Fibonacci-style BigInt inputs.
