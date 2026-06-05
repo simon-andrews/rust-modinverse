@@ -1,41 +1,40 @@
 rust-modinverse
 ===============
-Small library for finding the modular multiplicative inverses. Also has an implementation of the extended Euclidean algorithm built in.
 
-`modinverse`
-------------
-Calculates the [modular multiplicative
-inverse](https://en.wikipedia.org/wiki/Modular_multiplicative_inverse) *x* of
-an integer *a* such that *ax* ≡ 1 (mod *m*).
+Small `no_std` library for computing [modular multiplicative
+inverses](https://en.wikipedia.org/wiki/Modular_multiplicative_inverse). Also exposes an
+[extended Euclidean](https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm) primitive.
 
-Such an integer may not exist. If so, this function will return `None`.
-Otherwise, the inverse will be returned wrapped up in a `Some`.
+The `u128` path is mechanically verified — see [`proof/ModInverse.lean`](proof/ModInverse.lean)
+for the Lean 4 proof of soundness, completeness, and result bounds. The other paths reduce to
+it or to widened textbook extended-Euclidean, exercised by an exhaustive small-modulus test
+plus near-`T::MAX` regression tests.
+
+The `ModInverse` trait
+----------------------
+
+`ModInverse` is implemented for every built-in integer type — `i8`–`i128`, `u8`–`u128`,
+`isize`, `usize` — and (behind the `bigint` feature) for `num_bigint::BigInt` and
+`num_bigint::BigUint`.
 
 ```rust
 use modinverse::modinverse;
 
-let does_exist = modinverse(3, 26);
-let does_not_exist = modinverse(4, 32);
+assert_eq!(modinverse(3, 26), Some(9));
+assert_eq!(modinverse(4, 32), None);
 
-match does_exist {
-    Some(x) => assert_eq!(x, 9),
-    None => panic!("modinverse() didn't work as expected"),
-}
+// Works on unsigned types too:
+assert_eq!(modinverse(3u64, 26u64), Some(9));
 
-match does_not_exist {
-   Some(x) => panic!("modinverse() found an inverse when it shouldn't have"),
-   None => {},
-}
+// Negative modulus is canonicalized to [0, |m|):
+assert_eq!(modinverse(3i32, -26), Some(9));
 ```
 
 `egcd`
 ------
-Finds the greatest common denominator of two integers *a* and *b*, and two
-integers *x* and *y* such that *ax* + *by* is the greatest common denominator
-of *a* and *b* (Bézout coefficients).
 
-This function is an implementation of the [extended Euclidean
-algorithm](https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm).
+Free function returning `(gcd(a, b), x, y)` such that `ax + by = gcd(a, b)` (Bézout
+coefficients).
 
 ```rust
 use modinverse::egcd;
@@ -49,3 +48,18 @@ assert_eq!(x, -1);
 assert_eq!(y, 9);
 assert_eq!((a * x) + (b * y), g);
 ```
+
+For fixed-width signed types, `egcd` is not safe at or near `T::MIN`: intermediates like
+`T::MIN / -1` overflow. The crate's own `ModInverse` impls dodge this by widening one step
+first. If you call `egcd` directly, stay away from `T::MIN`.
+
+Features
+--------
+
+- **`bigint`** — enables `ModInverse` for `num_bigint::BigInt` and `num_bigint::BigUint`.
+
+`no_std`
+--------
+
+The crate is `#![no_std]` with no allocator requirement. The `bigint` feature pulls in
+`num-bigint` (with its default features off), which itself requires `alloc`.
