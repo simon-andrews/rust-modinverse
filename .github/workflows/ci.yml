@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  check-rust:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -17,3 +17,14 @@ jobs:
       - run: cargo test --all-features
       - run: cargo clippy --all-targets --all-features -- -D warnings
       - run: cargo doc --no-deps --all-features
+
+  check-lean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: proof
+      - name: assert no sorry in proof
+        run: |
+          ! grep -RnE '\bsorry\b' --include='*.lean' proof/
