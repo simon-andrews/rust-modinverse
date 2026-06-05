@@ -25,6 +25,6 @@ jobs:
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: proof
-      - name: assert no sorry in proof
+      - name: Assert no sorry in proof
         run: |
-          ! grep -RnE '\bsorry\b' --include='*.lean' proof/
+          ! grep -RnE '\bsorry\b' --include='*.lean' --exclude-dir=.lake proof/
