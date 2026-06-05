@@ -1,0 +1,20 @@
+name: Publish
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: |
+          tag="${GITHUB_REF_NAME#v}"
+          grep -q "^version = \"$tag\"\$" Cargo.toml \
+            || { echo "tag $tag does not match Cargo.toml"; exit 1; }
+      - run: cargo login ${{ secrets.CRATES_IO }}
+      - run: cargo package
+      - run: cargo publish
