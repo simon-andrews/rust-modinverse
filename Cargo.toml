@@ -8,6 +8,8 @@ description = "Small library for finding the modular multiplicative inverses."
 repository = "https://github.com/simon-andrews/rust-modinverse"
 readme = "README.md"
 license = "Unlicense"
+keywords = ["modular", "inverse", "number-theory", "mathematics", "no-std"]
+categories = ["mathematics", "algorithms", "no-std"]
 
 [features]
 default = []
