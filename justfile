@@ -2,19 +2,18 @@
 default:
     @just --list
 
-# Rust checks, as CI runs them: build, test, lint.
+# Rust checks, as CI runs them: build, test, lint, doc.
 check:
     cargo build --all-features
     cargo test --all-features
     cargo clippy --all-targets --all-features -- -D warnings
+    cargo doc --no-deps --all-features
 
 # Build the Lean proof.
 prove-correctness:
     cd proof && lake build
 
 # Regenerate the extracted Lean (extraction/Machine.lean) from the Rust source.
-# aeneas names its output after the crate; rename to the `Machine` module the proof
-# imports (it can't be `Modinverse` — that collides with `ModInverse` on macOS).
 extract:
     charon cargo --preset=aeneas
     aeneas -backend lean -loops-to-rec -dest extraction modinverse.llbc || true
