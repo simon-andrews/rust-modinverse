@@ -2,11 +2,13 @@
 //! the extended Euclidean algorithm built in.
 //!
 //! The [`ModInverse`] trait is implemented for every built-in integer type: `i8`–`i128`,
-//! `u8`–`u128`, `isize`, `usize`. Each impl is hand-tuned for its type — `i8`–`i64` widen one
-//! step and run the signed textbook algorithm in the wider type to dodge the `T::MIN` overflow;
-//! `u8`–`u64` widen to a signed type so they can share that path; `u128` uses a Russian-peasant
-//! routine because there's no native wider type to widen into; `i128` reuses the `u128` path
-//! after a sign-canonicalization that handles `i128::MIN` specifically; `isize`/`usize`
+//! `u8`–`u128`, `isize`, `usize`. Every fixed-width type runs the *same* algorithm: a
+//! per-step-reduced extended Euclidean inverse over the type's unsigned representation, which
+//! never forms a negative intermediate and so never overflows. Each width supplies a `mul_mod`
+//! computing `(a * b) % m` without overflow — widths up to `u64` form the product in the
+//! next-wider type, while `u128` uses a Russian-peasant routine because it has no wider type to
+//! widen into. Signed types canonicalize their input into `[0, |m|)`, delegate to the unsigned
+//! core (handling `T::MIN` losslessly), then cast the in-range result back. `isize`/`usize`
 //! dispatch to the matching fixed-width impl at compile time.
 //!
 //! With the `bigint` feature enabled, [`ModInverse`] is also implemented for
@@ -14,10 +16,10 @@
 //! types in the Rust ecosystem. It's gated behind a feature so users who don't need it don't
 //! pay the `num-bigint` compile cost.
 //!
-//! The `u128` path's correctness is certified in Lean 4.. The `i128` impl reuses `u128` after
-//! canonicalizing the sign, so the proof transfers. The widened `i8`–`i64` and `u8`–`u64` impls
-//! run a different algorithm (the signed textbook egcd in the wider type) and are *not* covered
-//! by the Lean proof — only by tests.
+//! Running one algorithm across every width is deliberate: it lets a single Lean 4 proof (stated
+//! over `ℕ`) certify the whole fixed-width surface by per-width refinement, rather than a separate
+//! proof per algorithm. The `bigint` paths run the generic helpers below and are not part of the
+//! Lean development.
 
 #![no_std]
 
@@ -74,18 +76,20 @@ pub fn egcd<T: Clone + Integer + Signed>(a: T, b: T) -> (T, T, T) {
 /// where the modulus may be negative. Returns the inverse of *a* mod *m* in the canonical range
 /// `[0, |m|)` when it exists, or `None` otherwise (when `gcd(a, m) ≠ 1`, or when `m == 0`).
 ///
-/// This is the path the `BigInt` impl uses directly, and the path the `i8`–`i64` impls land on
-/// after widening. It's faster than the unsigned per-step-reduced variant on arbitrary-precision
-/// types because each loop iteration does one full-width multiplication instead of `O(log b)`
-/// modular additions, but it carries a `T::MIN` panic footgun on fixed-width types — see below.
+/// This is the path the `BigInt` impl uses directly. It's faster than the unsigned
+/// per-step-reduced variant on arbitrary-precision types because each loop iteration does one
+/// full-width multiplication instead of `O(log b)` modular additions, but it carries a `T::MIN`
+/// panic footgun on fixed-width types — see below. The fixed-width impls therefore do *not* use
+/// it; they run the monomorphic unsigned core instead.
 ///
 /// # Panics
 ///
 /// Panics if `m == T::MIN` for a fixed-width signed type, because `|T::MIN|` is not
-/// representable in `T` and the internal `m.abs()` overflows. Widen one step before calling
-/// (the impls for `i8`–`i64` in this crate do exactly that). `a == T::MIN` is fine —
-/// the algorithm reduces `a` mod `|m|` without ever forming `|a|`. Arbitrary-precision types
-/// (e.g. `BigInt`) are unaffected.
+/// representable in `T` and the internal `m.abs()` overflows. Widen one step before calling.
+/// `a == T::MIN` is fine — the algorithm reduces `a` mod `|m|` without ever forming `|a|`.
+/// Arbitrary-precision types (e.g. `BigInt`) are unaffected, which is why this is kept only for
+/// the `bigint` feature.
+#[cfg(feature = "bigint")]
 pub(crate) fn modinverse_via_egcd_signed<T: Clone + Integer + Signed>(a: T, m: T) -> Option<T> {
     if m.is_zero() {
         return None;
@@ -106,16 +110,15 @@ pub(crate) fn modinverse_via_egcd_signed<T: Clone + Integer + Signed>(a: T, m: T
 /// which short-circuit).
 ///
 /// The caller supplies the modular multiplication function `mul_mod(a, b, m) → (a * b) mod m`.
-/// The two in-crate callers are:
-///
-/// * The `u128` impl plugs in `mul_mod_u128`, a hand-tuned Russian-peasant routine that avoids
-///   forming the full-width product (which wouldn't fit in `u128`).
-/// * The `BigUint` impl plugs in plain `(q * s).mod_floor(m)` because arbitrary-precision
-///   multiplication can't overflow.
+/// The sole in-crate caller is the `BigUint` impl, which plugs in plain `(q * s).mod_floor(m)`
+/// because arbitrary-precision multiplication can't overflow. (The fixed-width `u8`–`u128` impls
+/// run monomorphic copies of this same algorithm — see `modinverse_core!` — rather than going
+/// through this generic, closure-taking version, which Charon/Aeneas cannot lower.)
 ///
 /// The supplied closure is trusted to satisfy `mul_mod(a, b, m) == (a * b) mod m` and to return
 /// a value in `[0, m)`. Violating either may cause infinite loops or wrong answers; debug
 /// builds will trigger `debug_assert!` on the upper-bound violation.
+#[cfg(feature = "bigint")]
 pub(crate) fn modinverse_via_egcd_with<T, F>(a: T, m: T, mul_mod: F) -> Option<T>
 where
     T: Clone + Integer,
@@ -147,8 +150,10 @@ where
     }
 }
 
-// Same shape as `sub_mod_u128`: the `(m - b) + a` arm in the else branch stays below `m`,
-// so it can't overflow on fixed-width types where `m + a` would.
+// The `(m - b) + a` arm in the else branch stays below `m`, so it can't overflow on fixed-width
+// types where `m + a` would. Used only by the generic `bigint` path; the monomorphic cores inline
+// the same `if a >= b { a - b } else { (m - b) + a }` shape directly.
+#[cfg(feature = "bigint")]
 fn sub_mod_unsigned<T: Clone + Integer>(a: T, b: T, m: &T) -> T {
     if a >= b {
         a - b
@@ -185,73 +190,113 @@ pub fn modinverse<T: ModInverse>(a: T, m: T) -> Option<T> {
     a.modinverse(m)
 }
 
-// Widen one step into a signed type, run the textbook extended-Euclidean inverse there, narrow
-// back. Widening guarantees intermediate products like `q * x` don't overflow. For unsigned
-// inputs the wider signed type provides room for negative Bezout coefficients. The result lies
-// in `[0, |m|) ⊆ [0, T::MAX]`, so narrowing back is lossless.
-macro_rules! impl_modinverse_via_widening {
-    ($t:ty, $wide:ty) => {
-        impl ModInverse for $t {
-            fn modinverse(self, m: Self) -> Option<Self> {
-                modinverse_via_egcd_signed(self as $wide, m as $wide).map(|x| x as $t)
+// ---------------------------------------------------------------------------
+// Fixed-width integers: one algorithm for every width.
+//
+// Every fixed-width type runs the same per-step-reduced extended Euclidean inverse over its
+// *unsigned* representation. The only per-width detail is `mul_mod(a, b, m) = (a * b) % m`:
+// widths up to `u64` form the full product in the next-wider type; `u128` has no wider type and
+// uses the Russian-peasant routine `mul_mod_u128`. Each core is monomorphic and free of generics,
+// closures, and external traits, so it lowers cleanly through Charon/Aeneas for verification.
+// ---------------------------------------------------------------------------
+
+// `(a * b) % m` for narrow widths: widen to the next type so the product can't overflow.
+fn mul_mod_u8(a: u8, b: u8, m: u8) -> u8 {
+    ((a as u16 * b as u16) % m as u16) as u8
+}
+fn mul_mod_u16(a: u16, b: u16, m: u16) -> u16 {
+    ((a as u32 * b as u32) % m as u32) as u16
+}
+fn mul_mod_u32(a: u32, b: u32, m: u32) -> u32 {
+    ((a as u64 * b as u64) % m as u64) as u32
+}
+fn mul_mod_u64(a: u64, b: u64, m: u64) -> u64 {
+    ((a as u128 * b as u128) % m as u128) as u64
+}
+
+// The per-step-reduced extended Euclidean inverse, monomorphized per unsigned width. `mul_mod` is
+// a free function (not a closure) so the expansion stays first-order. Mirrors the generic
+// `modinverse_via_egcd_with`; the certified algorithm in proof/ModInverse.lean is this one.
+macro_rules! modinverse_core {
+    ($name:ident, $t:ty, $mul_mod:ident) => {
+        fn $name(a: $t, m: $t) -> Option<$t> {
+            if m == 0 {
+                return None;
+            }
+            if m == 1 {
+                return Some(0);
+            }
+            let (mut r, mut r_next) = (m, a % m);
+            let (mut s, mut s_next): ($t, $t) = (0, 1);
+            while r_next != 0 {
+                let q = r / r_next;
+                let rem = r % r_next;
+                let qs = $mul_mod(q, s_next, m);
+                (r, r_next) = (r_next, rem);
+                let s_new = if s >= qs { s - qs } else { (m - qs) + s };
+                (s, s_next) = (s_next, s_new);
+            }
+            if r == 1 {
+                Some(s)
+            } else {
+                None
             }
         }
     };
 }
 
-impl_modinverse_via_widening!(i8, i16);
-impl_modinverse_via_widening!(i16, i32);
-impl_modinverse_via_widening!(i32, i64);
-impl_modinverse_via_widening!(i64, i128);
+modinverse_core!(modinverse_u8, u8, mul_mod_u8);
+modinverse_core!(modinverse_u16, u16, mul_mod_u16);
+modinverse_core!(modinverse_u32, u32, mul_mod_u32);
+modinverse_core!(modinverse_u64, u64, mul_mod_u64);
+modinverse_core!(modinverse_u128, u128, mul_mod_u128);
 
-impl_modinverse_via_widening!(u8, i16);
-impl_modinverse_via_widening!(u16, i32);
-impl_modinverse_via_widening!(u32, i64);
-impl_modinverse_via_widening!(u64, i128);
-
-// ---------------------------------------------------------------------------
-// u128 / i128: no native wider type, so use the per-step-reduced extended Euclidean algorithm
-// (the variant whose correctness is certified in proof/ModInverse.lean). All multiplications
-// happen via `mul_mod_u128`, so nothing ever overflows.
-// ---------------------------------------------------------------------------
-
-impl ModInverse for u128 {
-    fn modinverse(self, m: Self) -> Option<Self> {
-        modinverse_u128(self, m)
-    }
-}
-
-// `i128` reuses the `u128` implementation. Reduce `a` to its representative in `[0, |m|)`,
-// compute the inverse there, and return it as `i128`. The result fits because it is also in
-// `[0, |m|) ⊆ [0, i128::MAX]` (since `|m|` fits in `i128`, hence ≤ `i128::MAX`).
-//
-// Subtle case: when `m == i128::MIN`, `|m| = 2^127` does *not* fit in `i128`. But any inverse
-// returned still fits, because it lies in `[0, |m|)` and must be coprime to `|m| = 2^127`
-// (i.e. odd). The value `2^127` itself is excluded by the strict upper bound and could never
-// be coprime anyway, so cast-back to `i128` is lossless even in this case.
-impl ModInverse for i128 {
-    fn modinverse(self, m: Self) -> Option<Self> {
-        if m == 0 {
-            return None;
+// Unsigned impls call their core directly.
+macro_rules! impl_modinverse_unsigned {
+    ($t:ty, $core:ident) => {
+        impl ModInverse for $t {
+            fn modinverse(self, m: Self) -> Option<Self> {
+                $core(self, m)
+            }
         }
-        let m_abs = m.unsigned_abs();
-        let a_abs = self.unsigned_abs() % m_abs;
-        let a_u = if self < 0 && a_abs != 0 {
-            m_abs - a_abs
-        } else {
-            a_abs
-        };
-        modinverse_u128(a_u, m_abs).map(|x| x as i128)
-    }
+    };
 }
 
-fn modinverse_u128(a: u128, m: u128) -> Option<u128> {
-    // Hand-tuned `mul_mod_u128` is much faster than the generic doubling routine on `u128`.
-    modinverse_via_egcd_with(a, m, |q, s, m| mul_mod_u128(q, s, *m))
+impl_modinverse_unsigned!(u8, modinverse_u8);
+impl_modinverse_unsigned!(u16, modinverse_u16);
+impl_modinverse_unsigned!(u32, modinverse_u32);
+impl_modinverse_unsigned!(u64, modinverse_u64);
+impl_modinverse_unsigned!(u128, modinverse_u128);
+
+// Signed impls canonicalize `self` into `[0, |m|)` over the unsigned type, run the unsigned core,
+// and cast the in-range result back. This is panic-free even at `T::MIN`: `unsigned_abs()` never
+// overflows, and any returned inverse lies in `[0, |m|)` and is coprime to `|m|`. When
+// `m == T::MIN`, `|m| = 2^(N-1)` does not fit in `T`, but it is excluded by the strict upper
+// bound and could never be coprime anyway, so the cast back is lossless even then.
+macro_rules! impl_modinverse_signed {
+    ($t:ty, $ut:ty, $core:ident) => {
+        impl ModInverse for $t {
+            fn modinverse(self, m: Self) -> Option<Self> {
+                if m == 0 {
+                    return None;
+                }
+                let m_abs: $ut = m.unsigned_abs();
+                let a_abs = self.unsigned_abs() % m_abs;
+                let a_u = if self < 0 && a_abs != 0 { m_abs - a_abs } else { a_abs };
+                $core(a_u, m_abs).map(|x| x as $t)
+            }
+        }
+    };
 }
+
+impl_modinverse_signed!(i8, u8, modinverse_u8);
+impl_modinverse_signed!(i16, u16, modinverse_u16);
+impl_modinverse_signed!(i32, u32, modinverse_u32);
+impl_modinverse_signed!(i64, u64, modinverse_u64);
+impl_modinverse_signed!(i128, u128, modinverse_u128);
 
 // Russian-peasant modular multiplication: computes (a * b) mod m without overflow, even when
-// `a` and `b` are full u128 values.
+// `a` and `b` are full u128 values. `u128` has no wider type to widen the product into.
 fn mul_mod_u128(mut a: u128, mut b: u128, m: u128) -> u128 {
     a %= m;
     let mut result = 0u128;
@@ -395,21 +440,22 @@ mod tests {
 
     // `i64::MIN.abs()` overflows; release builds wrap silently and would give a wrong answer
     // rather than panic, so gate the panic assertion on the overflow-checks build.
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, feature = "bigint"))]
     #[test]
     #[should_panic]
     fn modinverse_via_egcd_signed_panics_on_t_min() {
-        // The documented panic from the `# Panics` block on `modinverse_via_egcd_signed`.
+        // The documented panic from the `# Panics` block on `modinverse_via_egcd_signed` (kept
+        // for the `bigint` path; fixed-width types no longer route through this helper).
         let _ = modinverse_via_egcd_signed(3i64, i64::MIN);
     }
 
     #[test]
-    fn modinverse_widens_around_t_min() {
-        // Widening should keep the trait impl panic-free even at the type's MIN.
-        // i8::MIN = -128. The trait impl widens to i16 before calling the egcd helper.
+    fn modinverse_handles_t_min() {
+        // The signed impls canonicalize to unsigned, so they stay panic-free even at the type's
+        // MIN, where `T::MIN.abs()` would overflow. i8::MIN = -128.
         let inv = modinverse(3i8, i8::MIN).unwrap();
         assert_eq!((3i16 * inv as i16).rem_euclid(128), 1);
-        // Same for i64 -> i128 widening.
+        // Same at i64::MIN.
         let inv = modinverse(3i64, i64::MIN).unwrap();
         let m_abs = (i64::MIN as i128).unsigned_abs();
         assert_eq!((3u128 * inv as u128) % m_abs, 1);
