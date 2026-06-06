@@ -1,10 +1,31 @@
 name = "modinverse"
 defaultTargets = ["ModInverse"]
 
+# Pinned to match the Aeneas Lean backend (Lean 4.30.0-rc2 + mathlib v4.30.0-rc2),
+# so the Aeneas-extracted machine model and the hand model live in one project.
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
-version = "git#master"
+git = "https://github.com/leanprover-community/mathlib4.git"
+rev = "v4.30.0-rc2"
+
+# Aeneas's Lean support library (`Aeneas.Std`, the `Result` monad, fixed-width
+# scalars). Needed to typecheck the extracted `modinverse_u128`.
+[[require]]
+name = "aeneas"
+git = "https://github.com/AeneasVerif/aeneas.git"
+rev = "a2e779f00fc384c2f4d1131bbd573dc948ddf0d7"
+subDir = "backends/lean"
 
 [[lean_lib]]
 name = "ModInverse"
+
+# The Aeneas-extracted machine code (`charon` + `aeneas`) is the sole machine-
+# generated source and lives outside the proof tree, in `../extraction`, so the
+# extraction's own `sorry` (the unused generic egcd path) never trips the
+# `no sorry in proof/` check. The proof imports it as `import Machine`. The module
+# is named `Machine` rather than `Modinverse` because the latter collides with the
+# `ModInverse` root on case-insensitive filesystems (macOS).
+[[lean_lib]]
+name = "Machine"
+srcDir = "../extraction"

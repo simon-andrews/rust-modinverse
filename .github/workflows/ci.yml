@@ -26,5 +26,8 @@ jobs:
         with:
           lake-package-directory: proof
       - name: Assert no sorry in proof
+        # The extracted machine code's own hole lives in extraction/, not proof/, so
+        # it is not scanned; backticked mentions of the word in docstrings are not
+        # real sorries.
         run: |
-          ! grep -RnE '\bsorry\b' --include='*.lean' --exclude-dir=.lake proof/
+          ! grep -RnE '\bsorry\b' --include='*.lean' --exclude-dir=.lake proof/ | grep -vF '`sorry`'
