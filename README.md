@@ -5,10 +5,14 @@ Small `no_std` library for computing [modular multiplicative
 inverses](https://en.wikipedia.org/wiki/Modular_multiplicative_inverse). Also exposes an
 [extended Euclidean](https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm) primitive.
 
-The `u128` path is mechanically verified — see [`proof/ModInverse.lean`](proof/ModInverse.lean)
-for the Lean 4 proof of soundness, completeness, and result bounds. The other paths reduce to
-it or to widened textbook extended-Euclidean, exercised by an exhaustive small-modulus test
-plus near-`T::MAX` regression tests.
+Every fixed-width path (`u8`–`u128`, `i8`–`i128`, `usize`, `isize`) is mechanically verified,
+end to end: the Rust is extracted to Lean 4 (Charon + Aeneas) and, for each width, the
+extracted `modinverse` is proved to never error and to be sound, canonically bounded, complete,
+and failing exactly when no inverse exists. What "correct" means is pinned down by the
+human-maintained spec in [`proof/ModInverse.lean`](proof/ModInverse.lean); the trusted gate in
+[`proof/Gate.lean`](proof/Gate.lean) holds the build to those statements and audits the axioms
+every certificate depends on. The `bigint` paths and the free `egcd` are covered by tests
+(exhaustive over small moduli, plus near-`T::MAX`/`T::MIN` regressions) rather than proof.
 
 The `ModInverse` trait
 ----------------------
