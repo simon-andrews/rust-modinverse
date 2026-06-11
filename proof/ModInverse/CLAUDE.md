@@ -35,9 +35,9 @@ may be freely rewritten as long as both obligations below still discharge agains
   This is the Aeneas-tactic half; it has its own conventions, see
   [`Refinement/CLAUDE.md`](Refinement/CLAUDE.md).
 - `Refinement.lean` — aggregates the `Refinement/*` modules.
-- `Extern.lean` — **★ TRUSTED ★** the postulated specs for `core`/`std` symbols Aeneas left opaque
-  (TCB; see `../CLAUDE.md`). This is the *one* home for such postulates — any future opaque symbol's
-  spec goes here and nowhere else.
+- `Extern.lean` — **★ TRUSTED ★** the designated home for postulated specs of `core`/`std`
+  symbols Aeneas leaves opaque. **Currently empty** — the Rust is written inside the lowerable
+  subset, so nothing is postulated. Any future opaque symbol's spec goes here and nowhere else.
 
 Composing refinement (machine refines model) with `isCorrect` (model meets spec) certifies the
 real extracted code — that composition is the 14 `modinverse_*_correct` certificates, one per

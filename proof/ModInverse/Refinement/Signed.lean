@@ -4,20 +4,22 @@
   The signed `modinverse` for `iN` (extracted as `IN.Insts.ModinverseModInverse.modinverse`)
   returns `none` when `m = 0`; otherwise it canonicalizes `self` to `a_u ∈ [0, |m|)`
   (`ModInverse.reduceSigned`), runs the *unsigned* core on `(a_u, |m|)`, and casts the
-  inverse back via `Option.map`. Each `modinverse_iN_spec` says the machine never errors
-  and its `.val` matches `ModInverse.modinverse (reduceSigned self.val |m|) |m|`, lifted
-  to `ℤ`.
+  in-range inverse back. Each `modinverse_iN_spec` says the machine never errors and its
+  `.val` matches `ModInverse.modinverse (reduceSigned self.val |m|) |m|`, lifted to `ℤ`.
 
-  The cast back and the `Option.map` go through the trusted specs in `ModInverse.Extern`.
+  Everything in the extraction is ordinary code — `|x|` is a cast plus a wrapping negate
+  (`0 - x` in the unsigned type) and the cast back is a `match` — so nothing here rests
+  on postulates: the absolute-value computation is verified down to the two's-complement
+  bit level in the `neg_abs_uN` lemmas.
 
-  **Reading guide.** Each width is `signed_tail_iN` (the shared `modinverse_uN` + cast-back
-  tail, factoring out the three `a_u` branches' common work) followed by the spec proper.
-  The `i8` pair is the template; `i16`–`i128` are the same scripts with the width swapped.
-  Read `i8` and skim the rest. The single `hcast_val` lemma serves every width.
+  **Reading guide.** Each width is `neg_abs_uN` / `nonneg_abs_uN` / `abs_spec_uN` (the
+  extracted `|x|` if-expression computes `x.val.natAbs`), `signed_tail_iN` (the shared
+  `modinverse_uN` + cast-back tail), and the spec proper. The `i8` group is the template;
+  `i16`–`i128` are the same scripts with the width swapped. Read `i8` and skim the rest.
+  The single `hcast_val` lemma serves every width.
 -/
 
 import ModInverse.Refinement.Unsigned
-import ModInverse.Extern
 import ModInverse.Signed
 
 open Aeneas Aeneas.Std Result
@@ -34,34 +36,78 @@ private lemma hcast_val {src : UScalarTy} {tgt : IScalarTy} (s : UScalar src)
 
 /-! ## `i8` — the template -/
 
-/-- The shared tail: run `modinverse_u8` on the canonicalized input, then cast back
-    through `Option.map`. Factors the `Option.map`/`hcast` reasoning out of the three
-    `a_u` branches. -/
+/-- The cast-then-wrapping-negate computation of `|x|`, negative case: at the bit level,
+    `0 - (x as u8)` is `-x = |x|` for `x < 0`, with no overflow even at `MIN`. -/
+private lemma neg_abs_u8 (x : Std.I8) (hx : x.val < 0) :
+    (core.num.U8.wrapping_sub 0#u8 (IScalar.hcast UScalarTy.U8 x)).val = x.val.natAbs := by
+  have h1 : (IScalar.hcast UScalarTy.U8 x).val = x.bv.toNat := by
+    show (x.bv.signExtend 8).toNat = x.bv.toNat
+    rw [BitVec.signExtend_eq_setWidth_of_le _ (Nat.le_refl _), BitVec.setWidth_eq]
+  have h2 : (x.bv.toNat : ℤ) = x.val + 2 ^ 8 := by
+    have h := BitVec.toInt_eq_toNat_cond x.bv
+    have hval : x.val = x.bv.toInt := rfl
+    rw [hval] at hx ⊢
+    split at h <;> scalar_tac
+  simp only [core.num.U8.wrapping_sub_val_eq, h1]
+  norm_num [UScalar.size]
+  scalar_tac
+
+/-- `|x|` for nonnegative `x` is the plain cast. -/
+private lemma nonneg_abs_u8 (x : Std.I8) (hx : 0 ≤ x.val) :
+    (IScalar.hcast UScalarTy.U8 x).val = x.val.natAbs := by
+  have H := IScalar.hcast_inBounds_spec UScalarTy.U8 x ⟨hx, by scalar_tac⟩
+  have h : ((IScalar.hcast UScalarTy.U8 x).val : ℤ) = x.val := by
+    simpa [lift, WP.spec_ok] using H
+  scalar_tac
+
+/-- Spec for the whole extracted `|x|` if-expression. -/
+private lemma abs_spec_u8 (x : Std.I8) :
+    (if x < 0#i8 then do
+        let i ← lift (IScalar.hcast UScalarTy.U8 x)
+        ok (core.num.U8.wrapping_sub 0#u8 i)
+      else ok (IScalar.hcast UScalarTy.U8 x))
+      ⦃ (r : Std.U8) => r.val = x.val.natAbs ⦄ := by
+  split
+  · rename_i hneg
+    step*
+    rw [i_post]
+    exact neg_abs_u8 x (by scalar_tac)
+  · rename_i hpos
+    simp only [WP.spec_ok]
+    exact nonneg_abs_u8 x (by scalar_tac)
+
+/-- The shared tail: run `modinverse_u8` on the canonicalized input, then cast the
+    witness back through the extracted `match`. -/
 private lemma signed_tail_i8 {A : ℤ} (a_u m_abs : Std.U8) (M : ℕ)
     (hM : 0 < M) (hMle : M ≤ 128) (hmabs : m_abs.val = M)
     (hau : a_u.val = ModInverse.reduceSigned A M) :
-    (do let o ← modinverse_u8 a_u m_abs
-        core.option.Option.map
-          ModInverseI8.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU8I8 o ())
+    (do
+      let o ← modinverse_u8 a_u m_abs
+      match o with
+      | none => ok none
+      | some x => do
+        let i ← lift (UScalar.hcast IScalarTy.I8 x)
+        ok (some i))
       ⦃ (r : Option Std.I8) =>
           r.map (·.val) =
             (ModInverse.modinverse (ModInverse.reduceSigned A M) M).map (Int.ofNat ·) ⦄ := by
   step*
-  rw [hau, hmabs] at o_post
-  cases o with
-  | none =>
-    rw [ModInverse.Extern.Option_map_none]
-    have hmodel : ModInverse.modinverse (ModInverse.reduceSigned A M) M = none := by
-      simpa using o_post.symm
-    simp [WP.spec_ok, hmodel]
-  | some s =>
-    rw [ModInverse.Extern.Option_map_some]
-    simp only [Option.map_some] at o_post
-    have hsM : s.val < M := ModInverse.modinverse_lt _ M s.val hM o_post.symm
-    have hb : (s.val : ℤ) ≤ IScalar.max .I8 := by scalar_tac
+  · -- the core found no inverse
+    rename_i hnone
+    subst hnone
+    rw [hau, hmabs] at o_post
+    simp only [Option.map_none] at o_post ⊢
     rw [← o_post]
-    simp [ModInverseI8.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU8I8.call_once,
-          WP.spec_ok, hcast_val s hb]
+    simp
+  · -- the core found an inverse; cast it back
+    rename_i hsome
+    subst hsome
+    rw [hau, hmabs] at o_post
+    simp only [Option.map_some] at o_post
+    have hsM : x.val < M := ModInverse.modinverse_lt _ M x.val hM o_post.symm
+    have hb : (x.val : ℤ) ≤ IScalar.max IScalarTy.I8 := by scalar_tac
+    rw [i_post, ← o_post]
+    simp [hcast_val x hb]
 
 @[step]
 theorem modinverse_i8_spec (a m : Std.I8) :
@@ -71,21 +117,23 @@ theorem modinverse_i8_spec (a m : Std.I8) :
           (Int.ofNat ·) ⦄ := by
   unfold I8.Insts.ModinverseModInverse.modinverse
   step*
-  case h1 => simp [ModInverse.modinverse]                 -- m = 0 → none
+  case h1 => simp [ModInverse.modinverse]                      -- m = 0 → none
+  step with abs_spec_u8 as ⟨m_abs, m_abs_post⟩
+  step with abs_spec_u8 as ⟨s_abs, s_abs_post⟩
+  step as ⟨a_abs, a_abs_post⟩
   case hnz => rw [m_abs_post, Int.natAbs_ne_zero]; scalar_tac  -- side goal: |m| ≠ 0
-  -- main case: m ≠ 0
   have hMpos : 0 < (↑m : ℤ).natAbs := Int.natAbs_pos.mpr (by scalar_tac)
   have hMle : (↑m : ℤ).natAbs ≤ 128 :=
     ModInverse.natAbs_le_of_bounds (by scalar_tac) (by scalar_tac)
   have haabs : (↑a_abs : ℕ) = (↑a : ℤ).natAbs % (↑m : ℤ).natAbs := by
-    rw [a_abs_post, i_post, m_abs_post]
+    rw [a_abs_post, s_abs_post, m_abs_post]
   split
   · -- a < 0
     split
     · -- |a| % |m| ≠ 0 : a_u = |m| - |a| % |m|
-      step
+      step as ⟨a_u, a_u_post⟩
       refine signed_tail_i8 a_u m_abs _ hMpos hMle m_abs_post ?_
-      rw [a_u_post1, m_abs_post, haabs]
+      rw [a_u_post, m_abs_post, haabs]
       exact ModInverse.reduceSigned_eq_neg_pos hMpos (by scalar_tac) (by rw [← haabs]; scalar_tac)
     · -- |a| % |m| = 0 : a_u = 0
       refine signed_tail_i8 a_abs m_abs _ hMpos hMle m_abs_post ?_
@@ -99,31 +147,78 @@ theorem modinverse_i8_spec (a m : Std.I8) :
 
 /-! ## `i16` (width-copy of `i8`) -/
 
+/-- The cast-then-wrapping-negate computation of `|x|`, negative case: at the bit level,
+    `0 - (x as u16)` is `-x = |x|` for `x < 0`, with no overflow even at `MIN`. -/
+private lemma neg_abs_u16 (x : Std.I16) (hx : x.val < 0) :
+    (core.num.U16.wrapping_sub 0#u16 (IScalar.hcast UScalarTy.U16 x)).val = x.val.natAbs := by
+  have h1 : (IScalar.hcast UScalarTy.U16 x).val = x.bv.toNat := by
+    show (x.bv.signExtend 16).toNat = x.bv.toNat
+    rw [BitVec.signExtend_eq_setWidth_of_le _ (Nat.le_refl _), BitVec.setWidth_eq]
+  have h2 : (x.bv.toNat : ℤ) = x.val + 2 ^ 16 := by
+    have h := BitVec.toInt_eq_toNat_cond x.bv
+    have hval : x.val = x.bv.toInt := rfl
+    rw [hval] at hx ⊢
+    split at h <;> scalar_tac
+  simp only [core.num.U16.wrapping_sub_val_eq, h1]
+  norm_num [UScalar.size]
+  scalar_tac
+
+/-- `|x|` for nonnegative `x` is the plain cast. -/
+private lemma nonneg_abs_u16 (x : Std.I16) (hx : 0 ≤ x.val) :
+    (IScalar.hcast UScalarTy.U16 x).val = x.val.natAbs := by
+  have H := IScalar.hcast_inBounds_spec UScalarTy.U16 x ⟨hx, by scalar_tac⟩
+  have h : ((IScalar.hcast UScalarTy.U16 x).val : ℤ) = x.val := by
+    simpa [lift, WP.spec_ok] using H
+  scalar_tac
+
+/-- Spec for the whole extracted `|x|` if-expression. -/
+private lemma abs_spec_u16 (x : Std.I16) :
+    (if x < 0#i16 then do
+        let i ← lift (IScalar.hcast UScalarTy.U16 x)
+        ok (core.num.U16.wrapping_sub 0#u16 i)
+      else ok (IScalar.hcast UScalarTy.U16 x))
+      ⦃ (r : Std.U16) => r.val = x.val.natAbs ⦄ := by
+  split
+  · rename_i hneg
+    step*
+    rw [i_post]
+    exact neg_abs_u16 x (by scalar_tac)
+  · rename_i hpos
+    simp only [WP.spec_ok]
+    exact nonneg_abs_u16 x (by scalar_tac)
+
+/-- The shared tail: run `modinverse_u16` on the canonicalized input, then cast the
+    witness back through the extracted `match`. -/
 private lemma signed_tail_i16 {A : ℤ} (a_u m_abs : Std.U16) (M : ℕ)
     (hM : 0 < M) (hMle : M ≤ 32768) (hmabs : m_abs.val = M)
     (hau : a_u.val = ModInverse.reduceSigned A M) :
-    (do let o ← modinverse_u16 a_u m_abs
-        core.option.Option.map
-          ModInverseI16.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU16I16 o ())
+    (do
+      let o ← modinverse_u16 a_u m_abs
+      match o with
+      | none => ok none
+      | some x => do
+        let i ← lift (UScalar.hcast IScalarTy.I16 x)
+        ok (some i))
       ⦃ (r : Option Std.I16) =>
           r.map (·.val) =
             (ModInverse.modinverse (ModInverse.reduceSigned A M) M).map (Int.ofNat ·) ⦄ := by
   step*
-  rw [hau, hmabs] at o_post
-  cases o with
-  | none =>
-    rw [ModInverse.Extern.Option_map_none]
-    have hmodel : ModInverse.modinverse (ModInverse.reduceSigned A M) M = none := by
-      simpa using o_post.symm
-    simp [WP.spec_ok, hmodel]
-  | some s =>
-    rw [ModInverse.Extern.Option_map_some]
-    simp only [Option.map_some] at o_post
-    have hsM : s.val < M := ModInverse.modinverse_lt _ M s.val hM o_post.symm
-    have hb : (s.val : ℤ) ≤ IScalar.max .I16 := by scalar_tac
+  · -- the core found no inverse
+    rename_i hnone
+    subst hnone
+    rw [hau, hmabs] at o_post
+    simp only [Option.map_none] at o_post ⊢
     rw [← o_post]
-    simp [ModInverseI16.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU16I16.call_once,
-          WP.spec_ok, hcast_val s hb]
+    simp
+  · -- the core found an inverse; cast it back
+    rename_i hsome
+    subst hsome
+    rw [hau, hmabs] at o_post
+    simp only [Option.map_some] at o_post
+    have hsM : x.val < M := ModInverse.modinverse_lt _ M x.val hM o_post.symm
+    have hb : (x.val : ℤ) ≤ IScalar.max IScalarTy.I16 := by scalar_tac
+    rw [i_post, ← o_post]
+    simp [hcast_val x hb]
 
 @[step]
 theorem modinverse_i16_spec (a m : Std.I16) :
@@ -133,54 +228,108 @@ theorem modinverse_i16_spec (a m : Std.I16) :
           (Int.ofNat ·) ⦄ := by
   unfold I16.Insts.ModinverseModInverse.modinverse
   step*
-  case h1 => simp [ModInverse.modinverse]
-  case hnz => rw [m_abs_post, Int.natAbs_ne_zero]; scalar_tac
+  case h1 => simp [ModInverse.modinverse]                      -- m = 0 → none
+  step with abs_spec_u16 as ⟨m_abs, m_abs_post⟩
+  step with abs_spec_u16 as ⟨s_abs, s_abs_post⟩
+  step as ⟨a_abs, a_abs_post⟩
+  case hnz => rw [m_abs_post, Int.natAbs_ne_zero]; scalar_tac  -- side goal: |m| ≠ 0
   have hMpos : 0 < (↑m : ℤ).natAbs := Int.natAbs_pos.mpr (by scalar_tac)
   have hMle : (↑m : ℤ).natAbs ≤ 32768 :=
     ModInverse.natAbs_le_of_bounds (by scalar_tac) (by scalar_tac)
   have haabs : (↑a_abs : ℕ) = (↑a : ℤ).natAbs % (↑m : ℤ).natAbs := by
-    rw [a_abs_post, i_post, m_abs_post]
+    rw [a_abs_post, s_abs_post, m_abs_post]
   split
-  · split
-    · step
+  · -- a < 0
+    split
+    · -- |a| % |m| ≠ 0 : a_u = |m| - |a| % |m|
+      step as ⟨a_u, a_u_post⟩
       refine signed_tail_i16 a_u m_abs _ hMpos hMle m_abs_post ?_
-      rw [a_u_post1, m_abs_post, haabs]
+      rw [a_u_post, m_abs_post, haabs]
       exact ModInverse.reduceSigned_eq_neg_pos hMpos (by scalar_tac) (by rw [← haabs]; scalar_tac)
-    · refine signed_tail_i16 a_abs m_abs _ hMpos hMle m_abs_post ?_
+    · -- |a| % |m| = 0 : a_u = 0
+      refine signed_tail_i16 a_abs m_abs _ hMpos hMle m_abs_post ?_
       have hz : (↑a : ℤ).natAbs % (↑m : ℤ).natAbs = 0 := by rw [← haabs]; scalar_tac
       rw [haabs, hz]
       exact ModInverse.reduceSigned_eq_neg_zero hMpos hz
-  · refine signed_tail_i16 a_abs m_abs _ hMpos hMle m_abs_post ?_
+  · -- a ≥ 0 : a_u = |a| % |m|
+    refine signed_tail_i16 a_abs m_abs _ hMpos hMle m_abs_post ?_
     rw [haabs]
     exact ModInverse.reduceSigned_eq_nonneg hMpos (by scalar_tac)
 
 /-! ## `i32` (width-copy of `i8`) -/
 
+/-- The cast-then-wrapping-negate computation of `|x|`, negative case: at the bit level,
+    `0 - (x as u32)` is `-x = |x|` for `x < 0`, with no overflow even at `MIN`. -/
+private lemma neg_abs_u32 (x : Std.I32) (hx : x.val < 0) :
+    (core.num.U32.wrapping_sub 0#u32 (IScalar.hcast UScalarTy.U32 x)).val = x.val.natAbs := by
+  have h1 : (IScalar.hcast UScalarTy.U32 x).val = x.bv.toNat := by
+    show (x.bv.signExtend 32).toNat = x.bv.toNat
+    rw [BitVec.signExtend_eq_setWidth_of_le _ (Nat.le_refl _), BitVec.setWidth_eq]
+  have h2 : (x.bv.toNat : ℤ) = x.val + 2 ^ 32 := by
+    have h := BitVec.toInt_eq_toNat_cond x.bv
+    have hval : x.val = x.bv.toInt := rfl
+    rw [hval] at hx ⊢
+    split at h <;> scalar_tac
+  simp only [core.num.U32.wrapping_sub_val_eq, h1]
+  norm_num [UScalar.size]
+  scalar_tac
+
+/-- `|x|` for nonnegative `x` is the plain cast. -/
+private lemma nonneg_abs_u32 (x : Std.I32) (hx : 0 ≤ x.val) :
+    (IScalar.hcast UScalarTy.U32 x).val = x.val.natAbs := by
+  have H := IScalar.hcast_inBounds_spec UScalarTy.U32 x ⟨hx, by scalar_tac⟩
+  have h : ((IScalar.hcast UScalarTy.U32 x).val : ℤ) = x.val := by
+    simpa [lift, WP.spec_ok] using H
+  scalar_tac
+
+/-- Spec for the whole extracted `|x|` if-expression. -/
+private lemma abs_spec_u32 (x : Std.I32) :
+    (if x < 0#i32 then do
+        let i ← lift (IScalar.hcast UScalarTy.U32 x)
+        ok (core.num.U32.wrapping_sub 0#u32 i)
+      else ok (IScalar.hcast UScalarTy.U32 x))
+      ⦃ (r : Std.U32) => r.val = x.val.natAbs ⦄ := by
+  split
+  · rename_i hneg
+    step*
+    rw [i_post]
+    exact neg_abs_u32 x (by scalar_tac)
+  · rename_i hpos
+    simp only [WP.spec_ok]
+    exact nonneg_abs_u32 x (by scalar_tac)
+
+/-- The shared tail: run `modinverse_u32` on the canonicalized input, then cast the
+    witness back through the extracted `match`. -/
 private lemma signed_tail_i32 {A : ℤ} (a_u m_abs : Std.U32) (M : ℕ)
     (hM : 0 < M) (hMle : M ≤ 2147483648) (hmabs : m_abs.val = M)
     (hau : a_u.val = ModInverse.reduceSigned A M) :
-    (do let o ← modinverse_u32 a_u m_abs
-        core.option.Option.map
-          ModInverseI32.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU32I32 o ())
+    (do
+      let o ← modinverse_u32 a_u m_abs
+      match o with
+      | none => ok none
+      | some x => do
+        let i ← lift (UScalar.hcast IScalarTy.I32 x)
+        ok (some i))
       ⦃ (r : Option Std.I32) =>
           r.map (·.val) =
             (ModInverse.modinverse (ModInverse.reduceSigned A M) M).map (Int.ofNat ·) ⦄ := by
   step*
-  rw [hau, hmabs] at o_post
-  cases o with
-  | none =>
-    rw [ModInverse.Extern.Option_map_none]
-    have hmodel : ModInverse.modinverse (ModInverse.reduceSigned A M) M = none := by
-      simpa using o_post.symm
-    simp [WP.spec_ok, hmodel]
-  | some s =>
-    rw [ModInverse.Extern.Option_map_some]
-    simp only [Option.map_some] at o_post
-    have hsM : s.val < M := ModInverse.modinverse_lt _ M s.val hM o_post.symm
-    have hb : (s.val : ℤ) ≤ IScalar.max .I32 := by scalar_tac
+  · -- the core found no inverse
+    rename_i hnone
+    subst hnone
+    rw [hau, hmabs] at o_post
+    simp only [Option.map_none] at o_post ⊢
     rw [← o_post]
-    simp [ModInverseI32.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU32I32.call_once,
-          WP.spec_ok, hcast_val s hb]
+    simp
+  · -- the core found an inverse; cast it back
+    rename_i hsome
+    subst hsome
+    rw [hau, hmabs] at o_post
+    simp only [Option.map_some] at o_post
+    have hsM : x.val < M := ModInverse.modinverse_lt _ M x.val hM o_post.symm
+    have hb : (x.val : ℤ) ≤ IScalar.max IScalarTy.I32 := by scalar_tac
+    rw [i_post, ← o_post]
+    simp [hcast_val x hb]
 
 @[step]
 theorem modinverse_i32_spec (a m : Std.I32) :
@@ -190,54 +339,108 @@ theorem modinverse_i32_spec (a m : Std.I32) :
           (Int.ofNat ·) ⦄ := by
   unfold I32.Insts.ModinverseModInverse.modinverse
   step*
-  case h1 => simp [ModInverse.modinverse]
-  case hnz => rw [m_abs_post, Int.natAbs_ne_zero]; scalar_tac
+  case h1 => simp [ModInverse.modinverse]                      -- m = 0 → none
+  step with abs_spec_u32 as ⟨m_abs, m_abs_post⟩
+  step with abs_spec_u32 as ⟨s_abs, s_abs_post⟩
+  step as ⟨a_abs, a_abs_post⟩
+  case hnz => rw [m_abs_post, Int.natAbs_ne_zero]; scalar_tac  -- side goal: |m| ≠ 0
   have hMpos : 0 < (↑m : ℤ).natAbs := Int.natAbs_pos.mpr (by scalar_tac)
   have hMle : (↑m : ℤ).natAbs ≤ 2147483648 :=
     ModInverse.natAbs_le_of_bounds (by scalar_tac) (by scalar_tac)
   have haabs : (↑a_abs : ℕ) = (↑a : ℤ).natAbs % (↑m : ℤ).natAbs := by
-    rw [a_abs_post, i_post, m_abs_post]
+    rw [a_abs_post, s_abs_post, m_abs_post]
   split
-  · split
-    · step
+  · -- a < 0
+    split
+    · -- |a| % |m| ≠ 0 : a_u = |m| - |a| % |m|
+      step as ⟨a_u, a_u_post⟩
       refine signed_tail_i32 a_u m_abs _ hMpos hMle m_abs_post ?_
-      rw [a_u_post1, m_abs_post, haabs]
+      rw [a_u_post, m_abs_post, haabs]
       exact ModInverse.reduceSigned_eq_neg_pos hMpos (by scalar_tac) (by rw [← haabs]; scalar_tac)
-    · refine signed_tail_i32 a_abs m_abs _ hMpos hMle m_abs_post ?_
+    · -- |a| % |m| = 0 : a_u = 0
+      refine signed_tail_i32 a_abs m_abs _ hMpos hMle m_abs_post ?_
       have hz : (↑a : ℤ).natAbs % (↑m : ℤ).natAbs = 0 := by rw [← haabs]; scalar_tac
       rw [haabs, hz]
       exact ModInverse.reduceSigned_eq_neg_zero hMpos hz
-  · refine signed_tail_i32 a_abs m_abs _ hMpos hMle m_abs_post ?_
+  · -- a ≥ 0 : a_u = |a| % |m|
+    refine signed_tail_i32 a_abs m_abs _ hMpos hMle m_abs_post ?_
     rw [haabs]
     exact ModInverse.reduceSigned_eq_nonneg hMpos (by scalar_tac)
 
 /-! ## `i64` (width-copy of `i8`) -/
 
+/-- The cast-then-wrapping-negate computation of `|x|`, negative case: at the bit level,
+    `0 - (x as u64)` is `-x = |x|` for `x < 0`, with no overflow even at `MIN`. -/
+private lemma neg_abs_u64 (x : Std.I64) (hx : x.val < 0) :
+    (core.num.U64.wrapping_sub 0#u64 (IScalar.hcast UScalarTy.U64 x)).val = x.val.natAbs := by
+  have h1 : (IScalar.hcast UScalarTy.U64 x).val = x.bv.toNat := by
+    show (x.bv.signExtend 64).toNat = x.bv.toNat
+    rw [BitVec.signExtend_eq_setWidth_of_le _ (Nat.le_refl _), BitVec.setWidth_eq]
+  have h2 : (x.bv.toNat : ℤ) = x.val + 2 ^ 64 := by
+    have h := BitVec.toInt_eq_toNat_cond x.bv
+    have hval : x.val = x.bv.toInt := rfl
+    rw [hval] at hx ⊢
+    split at h <;> scalar_tac
+  simp only [core.num.U64.wrapping_sub_val_eq, h1]
+  norm_num [UScalar.size]
+  scalar_tac
+
+/-- `|x|` for nonnegative `x` is the plain cast. -/
+private lemma nonneg_abs_u64 (x : Std.I64) (hx : 0 ≤ x.val) :
+    (IScalar.hcast UScalarTy.U64 x).val = x.val.natAbs := by
+  have H := IScalar.hcast_inBounds_spec UScalarTy.U64 x ⟨hx, by scalar_tac⟩
+  have h : ((IScalar.hcast UScalarTy.U64 x).val : ℤ) = x.val := by
+    simpa [lift, WP.spec_ok] using H
+  scalar_tac
+
+/-- Spec for the whole extracted `|x|` if-expression. -/
+private lemma abs_spec_u64 (x : Std.I64) :
+    (if x < 0#i64 then do
+        let i ← lift (IScalar.hcast UScalarTy.U64 x)
+        ok (core.num.U64.wrapping_sub 0#u64 i)
+      else ok (IScalar.hcast UScalarTy.U64 x))
+      ⦃ (r : Std.U64) => r.val = x.val.natAbs ⦄ := by
+  split
+  · rename_i hneg
+    step*
+    rw [i_post]
+    exact neg_abs_u64 x (by scalar_tac)
+  · rename_i hpos
+    simp only [WP.spec_ok]
+    exact nonneg_abs_u64 x (by scalar_tac)
+
+/-- The shared tail: run `modinverse_u64` on the canonicalized input, then cast the
+    witness back through the extracted `match`. -/
 private lemma signed_tail_i64 {A : ℤ} (a_u m_abs : Std.U64) (M : ℕ)
     (hM : 0 < M) (hMle : M ≤ 9223372036854775808) (hmabs : m_abs.val = M)
     (hau : a_u.val = ModInverse.reduceSigned A M) :
-    (do let o ← modinverse_u64 a_u m_abs
-        core.option.Option.map
-          ModInverseI64.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU64I64 o ())
+    (do
+      let o ← modinverse_u64 a_u m_abs
+      match o with
+      | none => ok none
+      | some x => do
+        let i ← lift (UScalar.hcast IScalarTy.I64 x)
+        ok (some i))
       ⦃ (r : Option Std.I64) =>
           r.map (·.val) =
             (ModInverse.modinverse (ModInverse.reduceSigned A M) M).map (Int.ofNat ·) ⦄ := by
   step*
-  rw [hau, hmabs] at o_post
-  cases o with
-  | none =>
-    rw [ModInverse.Extern.Option_map_none]
-    have hmodel : ModInverse.modinverse (ModInverse.reduceSigned A M) M = none := by
-      simpa using o_post.symm
-    simp [WP.spec_ok, hmodel]
-  | some s =>
-    rw [ModInverse.Extern.Option_map_some]
-    simp only [Option.map_some] at o_post
-    have hsM : s.val < M := ModInverse.modinverse_lt _ M s.val hM o_post.symm
-    have hb : (s.val : ℤ) ≤ IScalar.max .I64 := by scalar_tac
+  · -- the core found no inverse
+    rename_i hnone
+    subst hnone
+    rw [hau, hmabs] at o_post
+    simp only [Option.map_none] at o_post ⊢
     rw [← o_post]
-    simp [ModInverseI64.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU64I64.call_once,
-          WP.spec_ok, hcast_val s hb]
+    simp
+  · -- the core found an inverse; cast it back
+    rename_i hsome
+    subst hsome
+    rw [hau, hmabs] at o_post
+    simp only [Option.map_some] at o_post
+    have hsM : x.val < M := ModInverse.modinverse_lt _ M x.val hM o_post.symm
+    have hb : (x.val : ℤ) ≤ IScalar.max IScalarTy.I64 := by scalar_tac
+    rw [i_post, ← o_post]
+    simp [hcast_val x hb]
 
 @[step]
 theorem modinverse_i64_spec (a m : Std.I64) :
@@ -247,54 +450,108 @@ theorem modinverse_i64_spec (a m : Std.I64) :
           (Int.ofNat ·) ⦄ := by
   unfold I64.Insts.ModinverseModInverse.modinverse
   step*
-  case h1 => simp [ModInverse.modinverse]
-  case hnz => rw [m_abs_post, Int.natAbs_ne_zero]; scalar_tac
+  case h1 => simp [ModInverse.modinverse]                      -- m = 0 → none
+  step with abs_spec_u64 as ⟨m_abs, m_abs_post⟩
+  step with abs_spec_u64 as ⟨s_abs, s_abs_post⟩
+  step as ⟨a_abs, a_abs_post⟩
+  case hnz => rw [m_abs_post, Int.natAbs_ne_zero]; scalar_tac  -- side goal: |m| ≠ 0
   have hMpos : 0 < (↑m : ℤ).natAbs := Int.natAbs_pos.mpr (by scalar_tac)
   have hMle : (↑m : ℤ).natAbs ≤ 9223372036854775808 :=
     ModInverse.natAbs_le_of_bounds (by scalar_tac) (by scalar_tac)
   have haabs : (↑a_abs : ℕ) = (↑a : ℤ).natAbs % (↑m : ℤ).natAbs := by
-    rw [a_abs_post, i_post, m_abs_post]
+    rw [a_abs_post, s_abs_post, m_abs_post]
   split
-  · split
-    · step
+  · -- a < 0
+    split
+    · -- |a| % |m| ≠ 0 : a_u = |m| - |a| % |m|
+      step as ⟨a_u, a_u_post⟩
       refine signed_tail_i64 a_u m_abs _ hMpos hMle m_abs_post ?_
-      rw [a_u_post1, m_abs_post, haabs]
+      rw [a_u_post, m_abs_post, haabs]
       exact ModInverse.reduceSigned_eq_neg_pos hMpos (by scalar_tac) (by rw [← haabs]; scalar_tac)
-    · refine signed_tail_i64 a_abs m_abs _ hMpos hMle m_abs_post ?_
+    · -- |a| % |m| = 0 : a_u = 0
+      refine signed_tail_i64 a_abs m_abs _ hMpos hMle m_abs_post ?_
       have hz : (↑a : ℤ).natAbs % (↑m : ℤ).natAbs = 0 := by rw [← haabs]; scalar_tac
       rw [haabs, hz]
       exact ModInverse.reduceSigned_eq_neg_zero hMpos hz
-  · refine signed_tail_i64 a_abs m_abs _ hMpos hMle m_abs_post ?_
+  · -- a ≥ 0 : a_u = |a| % |m|
+    refine signed_tail_i64 a_abs m_abs _ hMpos hMle m_abs_post ?_
     rw [haabs]
     exact ModInverse.reduceSigned_eq_nonneg hMpos (by scalar_tac)
 
 /-! ## `i128` (width-copy of `i8`) -/
 
+/-- The cast-then-wrapping-negate computation of `|x|`, negative case: at the bit level,
+    `0 - (x as u128)` is `-x = |x|` for `x < 0`, with no overflow even at `MIN`. -/
+private lemma neg_abs_u128 (x : Std.I128) (hx : x.val < 0) :
+    (core.num.U128.wrapping_sub 0#u128 (IScalar.hcast UScalarTy.U128 x)).val = x.val.natAbs := by
+  have h1 : (IScalar.hcast UScalarTy.U128 x).val = x.bv.toNat := by
+    show (x.bv.signExtend 128).toNat = x.bv.toNat
+    rw [BitVec.signExtend_eq_setWidth_of_le _ (Nat.le_refl _), BitVec.setWidth_eq]
+  have h2 : (x.bv.toNat : ℤ) = x.val + 2 ^ 128 := by
+    have h := BitVec.toInt_eq_toNat_cond x.bv
+    have hval : x.val = x.bv.toInt := rfl
+    rw [hval] at hx ⊢
+    split at h <;> scalar_tac
+  simp only [core.num.U128.wrapping_sub_val_eq, h1]
+  norm_num [UScalar.size]
+  scalar_tac
+
+/-- `|x|` for nonnegative `x` is the plain cast. -/
+private lemma nonneg_abs_u128 (x : Std.I128) (hx : 0 ≤ x.val) :
+    (IScalar.hcast UScalarTy.U128 x).val = x.val.natAbs := by
+  have H := IScalar.hcast_inBounds_spec UScalarTy.U128 x ⟨hx, by scalar_tac⟩
+  have h : ((IScalar.hcast UScalarTy.U128 x).val : ℤ) = x.val := by
+    simpa [lift, WP.spec_ok] using H
+  scalar_tac
+
+/-- Spec for the whole extracted `|x|` if-expression. -/
+private lemma abs_spec_u128 (x : Std.I128) :
+    (if x < 0#i128 then do
+        let i ← lift (IScalar.hcast UScalarTy.U128 x)
+        ok (core.num.U128.wrapping_sub 0#u128 i)
+      else ok (IScalar.hcast UScalarTy.U128 x))
+      ⦃ (r : Std.U128) => r.val = x.val.natAbs ⦄ := by
+  split
+  · rename_i hneg
+    step*
+    rw [i_post]
+    exact neg_abs_u128 x (by scalar_tac)
+  · rename_i hpos
+    simp only [WP.spec_ok]
+    exact nonneg_abs_u128 x (by scalar_tac)
+
+/-- The shared tail: run `modinverse_u128` on the canonicalized input, then cast the
+    witness back through the extracted `match`. -/
 private lemma signed_tail_i128 {A : ℤ} (a_u m_abs : Std.U128) (M : ℕ)
     (hM : 0 < M) (hMle : M ≤ 170141183460469231731687303715884105728) (hmabs : m_abs.val = M)
     (hau : a_u.val = ModInverse.reduceSigned A M) :
-    (do let o ← modinverse_u128 a_u m_abs
-        core.option.Option.map
-          ModInverseI128.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU128I128 o ())
+    (do
+      let o ← modinverse_u128 a_u m_abs
+      match o with
+      | none => ok none
+      | some x => do
+        let i ← lift (UScalar.hcast IScalarTy.I128 x)
+        ok (some i))
       ⦃ (r : Option Std.I128) =>
           r.map (·.val) =
             (ModInverse.modinverse (ModInverse.reduceSigned A M) M).map (Int.ofNat ·) ⦄ := by
   step*
-  rw [hau, hmabs] at o_post
-  cases o with
-  | none =>
-    rw [ModInverse.Extern.Option_map_none]
-    have hmodel : ModInverse.modinverse (ModInverse.reduceSigned A M) M = none := by
-      simpa using o_post.symm
-    simp [WP.spec_ok, hmodel]
-  | some s =>
-    rw [ModInverse.Extern.Option_map_some]
-    simp only [Option.map_some] at o_post
-    have hsM : s.val < M := ModInverse.modinverse_lt _ M s.val hM o_post.symm
-    have hb : (s.val : ℤ) ≤ IScalar.max .I128 := by scalar_tac
+  · -- the core found no inverse
+    rename_i hnone
+    subst hnone
+    rw [hau, hmabs] at o_post
+    simp only [Option.map_none] at o_post ⊢
     rw [← o_post]
-    simp [ModInverseI128.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU128I128.call_once,
-          WP.spec_ok, hcast_val s hb]
+    simp
+  · -- the core found an inverse; cast it back
+    rename_i hsome
+    subst hsome
+    rw [hau, hmabs] at o_post
+    simp only [Option.map_some] at o_post
+    have hsM : x.val < M := ModInverse.modinverse_lt _ M x.val hM o_post.symm
+    have hb : (x.val : ℤ) ≤ IScalar.max IScalarTy.I128 := by scalar_tac
+    rw [i_post, ← o_post]
+    simp [hcast_val x hb]
 
 @[step]
 theorem modinverse_i128_spec (a m : Std.I128) :
@@ -304,24 +561,31 @@ theorem modinverse_i128_spec (a m : Std.I128) :
           (Int.ofNat ·) ⦄ := by
   unfold I128.Insts.ModinverseModInverse.modinverse
   step*
-  case h1 => simp [ModInverse.modinverse]
-  case hnz => rw [m_abs_post, Int.natAbs_ne_zero]; scalar_tac
+  case h1 => simp [ModInverse.modinverse]                      -- m = 0 → none
+  step with abs_spec_u128 as ⟨m_abs, m_abs_post⟩
+  step with abs_spec_u128 as ⟨s_abs, s_abs_post⟩
+  step as ⟨a_abs, a_abs_post⟩
+  case hnz => rw [m_abs_post, Int.natAbs_ne_zero]; scalar_tac  -- side goal: |m| ≠ 0
   have hMpos : 0 < (↑m : ℤ).natAbs := Int.natAbs_pos.mpr (by scalar_tac)
   have hMle : (↑m : ℤ).natAbs ≤ 170141183460469231731687303715884105728 :=
     ModInverse.natAbs_le_of_bounds (by scalar_tac) (by scalar_tac)
   have haabs : (↑a_abs : ℕ) = (↑a : ℤ).natAbs % (↑m : ℤ).natAbs := by
-    rw [a_abs_post, i_post, m_abs_post]
+    rw [a_abs_post, s_abs_post, m_abs_post]
   split
-  · split
-    · step
+  · -- a < 0
+    split
+    · -- |a| % |m| ≠ 0 : a_u = |m| - |a| % |m|
+      step as ⟨a_u, a_u_post⟩
       refine signed_tail_i128 a_u m_abs _ hMpos hMle m_abs_post ?_
-      rw [a_u_post1, m_abs_post, haabs]
+      rw [a_u_post, m_abs_post, haabs]
       exact ModInverse.reduceSigned_eq_neg_pos hMpos (by scalar_tac) (by rw [← haabs]; scalar_tac)
-    · refine signed_tail_i128 a_abs m_abs _ hMpos hMle m_abs_post ?_
+    · -- |a| % |m| = 0 : a_u = 0
+      refine signed_tail_i128 a_abs m_abs _ hMpos hMle m_abs_post ?_
       have hz : (↑a : ℤ).natAbs % (↑m : ℤ).natAbs = 0 := by rw [← haabs]; scalar_tac
       rw [haabs, hz]
       exact ModInverse.reduceSigned_eq_neg_zero hMpos hz
-  · refine signed_tail_i128 a_abs m_abs _ hMpos hMle m_abs_post ?_
+  · -- a ≥ 0 : a_u = |a| % |m|
+    refine signed_tail_i128 a_abs m_abs _ hMpos hMle m_abs_post ?_
     rw [haabs]
     exact ModInverse.reduceSigned_eq_nonneg hMpos (by scalar_tac)
 

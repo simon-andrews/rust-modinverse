@@ -23,9 +23,10 @@
 
   The trusted computing base is exactly: this spec, the gate (`Gate.lean`, which
   re-types the final certificates at frozen statements and fails the build on any
-  unapproved axiom), Lean's kernel and standard axioms, the Charon/Aeneas pipeline,
-  and any postulates for `core`/`std` symbols Aeneas cannot lower (the AI collects
-  these in `ModInverse/Extern.lean`). The unsigned path needs none of the last.
+  unapproved axiom), Lean's kernel and standard axioms, and the Charon/Aeneas
+  pipeline. Postulates for `core`/`std` symbols Aeneas cannot lower would live in
+  `ModInverse/Extern.lean`; there are currently none — every certificate depends
+  on Lean's three standard axioms alone.
 
   ## The specification: what "correct" means
 

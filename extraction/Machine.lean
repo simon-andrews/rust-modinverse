@@ -12,45 +12,7 @@ set_option maxHeartbeats 1000000
 /- You can set the `maxRecDepth` value with the `-max-recdepth` CLI option -/
 set_option maxRecDepth 2048
 
-/- You can remove the following line by using the CLI option `-all-computable`: -/
-noncomputable section
-
 namespace modinverse
-
-/-- [core::num::{i8}::unsigned_abs]:
-    Source: '/rustc/library/core/src/num/int_macros.rs', lines 2486:8-2486:53
-    Name pattern: [core::num::{i8}::unsigned_abs]
-    Visibility: public -/
-@[rust_fun "core::num::{i8}::unsigned_abs"]
-axiom core.num.I8.unsigned_abs : Std.I8 → Result Std.U8
-
-/-- [core::num::{i16}::unsigned_abs]:
-    Source: '/rustc/library/core/src/num/int_macros.rs', lines 2486:8-2486:53
-    Name pattern: [core::num::{i16}::unsigned_abs]
-    Visibility: public -/
-@[rust_fun "core::num::{i16}::unsigned_abs"]
-axiom core.num.I16.unsigned_abs : Std.I16 → Result Std.U16
-
-/-- [core::num::{i32}::unsigned_abs]:
-    Source: '/rustc/library/core/src/num/int_macros.rs', lines 2486:8-2486:53
-    Name pattern: [core::num::{i32}::unsigned_abs]
-    Visibility: public -/
-@[rust_fun "core::num::{i32}::unsigned_abs"]
-axiom core.num.I32.unsigned_abs : Std.I32 → Result Std.U32
-
-/-- [core::num::{i64}::unsigned_abs]:
-    Source: '/rustc/library/core/src/num/int_macros.rs', lines 2486:8-2486:53
-    Name pattern: [core::num::{i64}::unsigned_abs]
-    Visibility: public -/
-@[rust_fun "core::num::{i64}::unsigned_abs"]
-axiom core.num.I64.unsigned_abs : Std.I64 → Result Std.U64
-
-/-- [core::num::{i128}::unsigned_abs]:
-    Source: '/rustc/library/core/src/num/int_macros.rs', lines 2486:8-2486:53
-    Name pattern: [core::num::{i128}::unsigned_abs]
-    Visibility: public -/
-@[rust_fun "core::num::{i128}::unsigned_abs"]
-axiom core.num.I128.unsigned_abs : Std.I128 → Result Std.U128
 
 /-- Trait declaration: [core::ops::arith::Add]
     Source: '/rustc/library/core/src/ops/arith.rs', lines 76:0-76:31
@@ -104,16 +66,6 @@ structure core.ops.arith.Rem (Self : Type) (Rhs : Type) (Self_Output : Type)
 @[rust_trait "core::ops::arith::Neg"]
 structure core.ops.arith.Neg (Self : Type) (Self_Output : Type) where
   neg : Self → Result Self_Output
-
-/-- [core::option::{core::option::Option<T>}::map]:
-    Source: '/rustc/library/core/src/option.rs', lines 1157:4-1159:53
-    Name pattern: [core::option::{core::option::Option<@T>}::map]
-    Visibility: public -/
-@[rust_fun "core::option::{core::option::Option<@T>}::map"]
-axiom core.option.Option.map
-  {T : Type} {U : Type} {F : Type} (opsfunctionFnOnceFTupleTUInst :
-  core.ops.function.FnOnce F T U) :
-  Option T → F → Result (Option U)
 
 /-- Trait declaration: [num_traits::NumOps]
     Source: '/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-traits-0.2.19/src/lib.rs', lines 101:0-106:31
@@ -423,7 +375,7 @@ def modinverse_u64 (a : Std.U64) (m : Std.U64) : Result (Option Std.U64) := do
       else ok none
 
 /-- [modinverse::add_mod_u128]:
-    Source: 'src/lib.rs', lines 314:0-321:1 -/
+    Source: 'src/lib.rs', lines 330:0-337:1 -/
 def add_mod_u128
   (a : Std.U128) (b : Std.U128) (m : Std.U128) : Result Std.U128 := do
   let room ← m - a
@@ -432,7 +384,7 @@ def add_mod_u128
   else b - room
 
 /-- [modinverse::mul_mod_u128]: loop 0:
-    Source: 'src/lib.rs', lines 303:4-309:5 -/
+    Source: 'src/lib.rs', lines 319:4-325:5 -/
 @[rust_loop]
 def mul_mod_u128_loop
   (a : Std.U128) (b : Std.U128) (m : Std.U128) (result : Std.U128) :
@@ -451,7 +403,7 @@ def mul_mod_u128_loop
 partial_fixpoint
 
 /-- [modinverse::mul_mod_u128]:
-    Source: 'src/lib.rs', lines 300:0-311:1 -/
+    Source: 'src/lib.rs', lines 316:0-327:1 -/
 def mul_mod_u128
   (a : Std.U128) (b : Std.U128) (m : Std.U128) : Result Std.U128 := do
   let a1 ← a % m
@@ -566,40 +518,29 @@ def U128.Insts.ModinverseModInverse : ModInverse Std.U128 := {
   modinverse := U128.Insts.ModinverseModInverse.modinverse
 }
 
-/-- [modinverse::{impl modinverse::ModInverse for i8}::modinverse::closure]
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-@[reducible]
-def ModInverseI8.modinverse.closure := Unit
-
-/-- [modinverse::{impl modinverse::ModInverse for i8}::modinverse::{impl core::ops::function::FnOnce<(u8,), i8> for modinverse::{impl modinverse::ModInverse for i8}::modinverse::closure}::call_once]:
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-def
-  ModInverseI8.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU8I8.call_once
-  (c : ModInverseI8.modinverse.closure) (tupled_args : Std.U8) :
-  Result Std.I8
-  := do
-  ok (UScalar.hcast .I8 tupled_args)
-
-/-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i8}::modinverse::{impl core::ops::function::FnOnce<(u8,), i8> for modinverse::{impl modinverse::ModInverse for i8}::modinverse::closure}]
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-@[reducible]
-def ModInverseI8.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU8I8 :
-  core.ops.function.FnOnce ModInverseI8.modinverse.closure Std.U8 Std.I8 := {
-  call_once :=
-    ModInverseI8.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU8I8.call_once
-}
-
 /-- [modinverse::{impl modinverse::ModInverse for i8}::modinverse]:
-    Source: 'src/lib.rs', lines 279:12-287:13
+    Source: 'src/lib.rs', lines 287:12-303:13
     Visibility: public -/
 def I8.Insts.ModinverseModInverse.modinverse
   (self : Std.I8) (m : Std.I8) : Result (Option Std.I8) := do
   if m = 0#i8
   then ok none
   else
-    let m_abs ← core.num.I8.unsigned_abs m
-    let i ← core.num.I8.unsigned_abs self
-    let a_abs ← i % m_abs
+    let m_abs ←
+      if m < 0#i8
+      then
+        do
+        let i ← lift (IScalar.hcast .U8 m)
+        ok (core.num.U8.wrapping_sub 0#u8 i)
+      else ok (IScalar.hcast .U8 m)
+    let s_abs ←
+      if self < 0#i8
+      then
+        do
+        let i ← lift (IScalar.hcast .U8 self)
+        ok (core.num.U8.wrapping_sub 0#u8 i)
+      else ok (IScalar.hcast .U8 self)
+    let a_abs ← s_abs % m_abs
     let a_u ←
       if self < 0#i8
       then if a_abs != 0#u8
@@ -607,51 +548,41 @@ def I8.Insts.ModinverseModInverse.modinverse
            else ok a_abs
       else ok a_abs
     let o ← modinverse_u8 a_u m_abs
-    core.option.Option.map
-      ModInverseI8.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU8I8 o ()
+    match o with
+    | none => ok none
+    | some x => let i ← lift (UScalar.hcast .I8 x)
+                ok (some i)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i8}]
-    Source: 'src/lib.rs', lines 278:8-288:9 -/
+    Source: 'src/lib.rs', lines 284:8-304:9 -/
 @[reducible]
 def I8.Insts.ModinverseModInverse : ModInverse Std.I8 := {
   modinverse := I8.Insts.ModinverseModInverse.modinverse
 }
 
-/-- [modinverse::{impl modinverse::ModInverse for i16}::modinverse::closure]
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-@[reducible]
-def ModInverseI16.modinverse.closure := Unit
-
-/-- [modinverse::{impl modinverse::ModInverse for i16}::modinverse::{impl core::ops::function::FnOnce<(u16,), i16> for modinverse::{impl modinverse::ModInverse for i16}::modinverse::closure}::call_once]:
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-def
-  ModInverseI16.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU16I16.call_once
-  (c : ModInverseI16.modinverse.closure) (tupled_args : Std.U16) :
-  Result Std.I16
-  := do
-  ok (UScalar.hcast .I16 tupled_args)
-
-/-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i16}::modinverse::{impl core::ops::function::FnOnce<(u16,), i16> for modinverse::{impl modinverse::ModInverse for i16}::modinverse::closure}]
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-@[reducible]
-def ModInverseI16.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU16I16 :
-  core.ops.function.FnOnce ModInverseI16.modinverse.closure Std.U16 Std.I16
-  := {
-  call_once :=
-    ModInverseI16.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU16I16.call_once
-}
-
 /-- [modinverse::{impl modinverse::ModInverse for i16}::modinverse]:
-    Source: 'src/lib.rs', lines 279:12-287:13
+    Source: 'src/lib.rs', lines 287:12-303:13
     Visibility: public -/
 def I16.Insts.ModinverseModInverse.modinverse
   (self : Std.I16) (m : Std.I16) : Result (Option Std.I16) := do
   if m = 0#i16
   then ok none
   else
-    let m_abs ← core.num.I16.unsigned_abs m
-    let i ← core.num.I16.unsigned_abs self
-    let a_abs ← i % m_abs
+    let m_abs ←
+      if m < 0#i16
+      then
+        do
+        let i ← lift (IScalar.hcast .U16 m)
+        ok (core.num.U16.wrapping_sub 0#u16 i)
+      else ok (IScalar.hcast .U16 m)
+    let s_abs ←
+      if self < 0#i16
+      then
+        do
+        let i ← lift (IScalar.hcast .U16 self)
+        ok (core.num.U16.wrapping_sub 0#u16 i)
+      else ok (IScalar.hcast .U16 self)
+    let a_abs ← s_abs % m_abs
     let a_u ←
       if self < 0#i16
       then if a_abs != 0#u16
@@ -659,52 +590,41 @@ def I16.Insts.ModinverseModInverse.modinverse
            else ok a_abs
       else ok a_abs
     let o ← modinverse_u16 a_u m_abs
-    core.option.Option.map
-      ModInverseI16.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU16I16 o
-      ()
+    match o with
+    | none => ok none
+    | some x => let i ← lift (UScalar.hcast .I16 x)
+                ok (some i)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i16}]
-    Source: 'src/lib.rs', lines 278:8-288:9 -/
+    Source: 'src/lib.rs', lines 284:8-304:9 -/
 @[reducible]
 def I16.Insts.ModinverseModInverse : ModInverse Std.I16 := {
   modinverse := I16.Insts.ModinverseModInverse.modinverse
 }
 
-/-- [modinverse::{impl modinverse::ModInverse for i32}::modinverse::closure]
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-@[reducible]
-def ModInverseI32.modinverse.closure := Unit
-
-/-- [modinverse::{impl modinverse::ModInverse for i32}::modinverse::{impl core::ops::function::FnOnce<(u32,), i32> for modinverse::{impl modinverse::ModInverse for i32}::modinverse::closure}::call_once]:
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-def
-  ModInverseI32.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU32I32.call_once
-  (c : ModInverseI32.modinverse.closure) (tupled_args : Std.U32) :
-  Result Std.I32
-  := do
-  ok (UScalar.hcast .I32 tupled_args)
-
-/-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i32}::modinverse::{impl core::ops::function::FnOnce<(u32,), i32> for modinverse::{impl modinverse::ModInverse for i32}::modinverse::closure}]
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-@[reducible]
-def ModInverseI32.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU32I32 :
-  core.ops.function.FnOnce ModInverseI32.modinverse.closure Std.U32 Std.I32
-  := {
-  call_once :=
-    ModInverseI32.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU32I32.call_once
-}
-
 /-- [modinverse::{impl modinverse::ModInverse for i32}::modinverse]:
-    Source: 'src/lib.rs', lines 279:12-287:13
+    Source: 'src/lib.rs', lines 287:12-303:13
     Visibility: public -/
 def I32.Insts.ModinverseModInverse.modinverse
   (self : Std.I32) (m : Std.I32) : Result (Option Std.I32) := do
   if m = 0#i32
   then ok none
   else
-    let m_abs ← core.num.I32.unsigned_abs m
-    let i ← core.num.I32.unsigned_abs self
-    let a_abs ← i % m_abs
+    let m_abs ←
+      if m < 0#i32
+      then
+        do
+        let i ← lift (IScalar.hcast .U32 m)
+        ok (core.num.U32.wrapping_sub 0#u32 i)
+      else ok (IScalar.hcast .U32 m)
+    let s_abs ←
+      if self < 0#i32
+      then
+        do
+        let i ← lift (IScalar.hcast .U32 self)
+        ok (core.num.U32.wrapping_sub 0#u32 i)
+      else ok (IScalar.hcast .U32 self)
+    let a_abs ← s_abs % m_abs
     let a_u ←
       if self < 0#i32
       then if a_abs != 0#u32
@@ -712,52 +632,41 @@ def I32.Insts.ModinverseModInverse.modinverse
            else ok a_abs
       else ok a_abs
     let o ← modinverse_u32 a_u m_abs
-    core.option.Option.map
-      ModInverseI32.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU32I32 o
-      ()
+    match o with
+    | none => ok none
+    | some x => let i ← lift (UScalar.hcast .I32 x)
+                ok (some i)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i32}]
-    Source: 'src/lib.rs', lines 278:8-288:9 -/
+    Source: 'src/lib.rs', lines 284:8-304:9 -/
 @[reducible]
 def I32.Insts.ModinverseModInverse : ModInverse Std.I32 := {
   modinverse := I32.Insts.ModinverseModInverse.modinverse
 }
 
-/-- [modinverse::{impl modinverse::ModInverse for i64}::modinverse::closure]
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-@[reducible]
-def ModInverseI64.modinverse.closure := Unit
-
-/-- [modinverse::{impl modinverse::ModInverse for i64}::modinverse::{impl core::ops::function::FnOnce<(u64,), i64> for modinverse::{impl modinverse::ModInverse for i64}::modinverse::closure}::call_once]:
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-def
-  ModInverseI64.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU64I64.call_once
-  (c : ModInverseI64.modinverse.closure) (tupled_args : Std.U64) :
-  Result Std.I64
-  := do
-  ok (UScalar.hcast .I64 tupled_args)
-
-/-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i64}::modinverse::{impl core::ops::function::FnOnce<(u64,), i64> for modinverse::{impl modinverse::ModInverse for i64}::modinverse::closure}]
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-@[reducible]
-def ModInverseI64.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU64I64 :
-  core.ops.function.FnOnce ModInverseI64.modinverse.closure Std.U64 Std.I64
-  := {
-  call_once :=
-    ModInverseI64.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU64I64.call_once
-}
-
 /-- [modinverse::{impl modinverse::ModInverse for i64}::modinverse]:
-    Source: 'src/lib.rs', lines 279:12-287:13
+    Source: 'src/lib.rs', lines 287:12-303:13
     Visibility: public -/
 def I64.Insts.ModinverseModInverse.modinverse
   (self : Std.I64) (m : Std.I64) : Result (Option Std.I64) := do
   if m = 0#i64
   then ok none
   else
-    let m_abs ← core.num.I64.unsigned_abs m
-    let i ← core.num.I64.unsigned_abs self
-    let a_abs ← i % m_abs
+    let m_abs ←
+      if m < 0#i64
+      then
+        do
+        let i ← lift (IScalar.hcast .U64 m)
+        ok (core.num.U64.wrapping_sub 0#u64 i)
+      else ok (IScalar.hcast .U64 m)
+    let s_abs ←
+      if self < 0#i64
+      then
+        do
+        let i ← lift (IScalar.hcast .U64 self)
+        ok (core.num.U64.wrapping_sub 0#u64 i)
+      else ok (IScalar.hcast .U64 self)
+    let a_abs ← s_abs % m_abs
     let a_u ←
       if self < 0#i64
       then if a_abs != 0#u64
@@ -765,52 +674,41 @@ def I64.Insts.ModinverseModInverse.modinverse
            else ok a_abs
       else ok a_abs
     let o ← modinverse_u64 a_u m_abs
-    core.option.Option.map
-      ModInverseI64.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU64I64 o
-      ()
+    match o with
+    | none => ok none
+    | some x => let i ← lift (UScalar.hcast .I64 x)
+                ok (some i)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i64}]
-    Source: 'src/lib.rs', lines 278:8-288:9 -/
+    Source: 'src/lib.rs', lines 284:8-304:9 -/
 @[reducible]
 def I64.Insts.ModinverseModInverse : ModInverse Std.I64 := {
   modinverse := I64.Insts.ModinverseModInverse.modinverse
 }
 
-/-- [modinverse::{impl modinverse::ModInverse for i128}::modinverse::closure]
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-@[reducible]
-def ModInverseI128.modinverse.closure := Unit
-
-/-- [modinverse::{impl modinverse::ModInverse for i128}::modinverse::{impl core::ops::function::FnOnce<(u128,), i128> for modinverse::{impl modinverse::ModInverse for i128}::modinverse::closure}::call_once]:
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-def
-  ModInverseI128.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU128I128.call_once
-  (c : ModInverseI128.modinverse.closure) (tupled_args : Std.U128) :
-  Result Std.I128
-  := do
-  ok (UScalar.hcast .I128 tupled_args)
-
-/-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i128}::modinverse::{impl core::ops::function::FnOnce<(u128,), i128> for modinverse::{impl modinverse::ModInverse for i128}::modinverse::closure}]
-    Source: 'src/lib.rs', lines 278:28-286:46 -/
-@[reducible]
-def ModInverseI128.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU128I128
-  : core.ops.function.FnOnce ModInverseI128.modinverse.closure Std.U128
-  Std.I128 := {
-  call_once :=
-    ModInverseI128.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU128I128.call_once
-}
-
 /-- [modinverse::{impl modinverse::ModInverse for i128}::modinverse]:
-    Source: 'src/lib.rs', lines 279:12-287:13
+    Source: 'src/lib.rs', lines 287:12-303:13
     Visibility: public -/
 def I128.Insts.ModinverseModInverse.modinverse
   (self : Std.I128) (m : Std.I128) : Result (Option Std.I128) := do
   if m = 0#i128
   then ok none
   else
-    let m_abs ← core.num.I128.unsigned_abs m
-    let i ← core.num.I128.unsigned_abs self
-    let a_abs ← i % m_abs
+    let m_abs ←
+      if m < 0#i128
+      then
+        do
+        let i ← lift (IScalar.hcast .U128 m)
+        ok (core.num.U128.wrapping_sub 0#u128 i)
+      else ok (IScalar.hcast .U128 m)
+    let s_abs ←
+      if self < 0#i128
+      then
+        do
+        let i ← lift (IScalar.hcast .U128 self)
+        ok (core.num.U128.wrapping_sub 0#u128 i)
+      else ok (IScalar.hcast .U128 self)
+    let a_abs ← s_abs % m_abs
     let a_u ←
       if self < 0#i128
       then if a_abs != 0#u128
@@ -818,98 +716,53 @@ def I128.Insts.ModinverseModInverse.modinverse
            else ok a_abs
       else ok a_abs
     let o ← modinverse_u128 a_u m_abs
-    core.option.Option.map
-      ModInverseI128.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU128I128
-      o ()
+    match o with
+    | none => ok none
+    | some x => let i ← lift (UScalar.hcast .I128 x)
+                ok (some i)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i128}]
-    Source: 'src/lib.rs', lines 278:8-288:9 -/
+    Source: 'src/lib.rs', lines 284:8-304:9 -/
 @[reducible]
 def I128.Insts.ModinverseModInverse : ModInverse Std.I128 := {
   modinverse := I128.Insts.ModinverseModInverse.modinverse
 }
 
-/-- [modinverse::{impl modinverse::ModInverse for usize}::modinverse::closure]
-    Source: 'src/lib.rs', lines 352:47-352:61 -/
-@[reducible]
-def ModInverseUsize.modinverse.closure := Unit
-
-/-- [modinverse::{impl modinverse::ModInverse for usize}::modinverse::{impl core::ops::function::FnOnce<(u64,), usize> for modinverse::{impl modinverse::ModInverse for usize}::modinverse::closure}::call_once]:
-    Source: 'src/lib.rs', lines 352:47-352:61 -/
-def
-  ModInverseUsize.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU64Usize.call_once
-  (c : ModInverseUsize.modinverse.closure) (tupled_args : Std.U64) :
-  Result Std.Usize
-  := do
-  ok (UScalar.cast .Usize tupled_args)
-
-/-- Trait implementation: [modinverse::{impl modinverse::ModInverse for usize}::modinverse::{impl core::ops::function::FnOnce<(u64,), usize> for modinverse::{impl modinverse::ModInverse for usize}::modinverse::closure}]
-    Source: 'src/lib.rs', lines 352:47-352:61 -/
-@[reducible]
-def ModInverseUsize.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU64Usize
-  : core.ops.function.FnOnce ModInverseUsize.modinverse.closure Std.U64
-  Std.Usize := {
-  call_once :=
-    ModInverseUsize.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU64Usize.call_once
-}
-
 /-- [modinverse::{impl modinverse::ModInverse for usize}::modinverse]:
-    Source: 'src/lib.rs', lines 351:4-353:5
+    Source: 'src/lib.rs', lines 379:4-384:5
     Visibility: public -/
 def Usize.Insts.ModinverseModInverse.modinverse
   (self : Std.Usize) (m : Std.Usize) : Result (Option Std.Usize) := do
   let i ← lift (UScalar.cast .U64 self)
   let i1 ← lift (UScalar.cast .U64 m)
   let o ← U64.Insts.ModinverseModInverse.modinverse i i1
-  core.option.Option.map
-    ModInverseUsize.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleU64Usize
-    o ()
+  match o with
+  | none => ok none
+  | some x => let i2 ← lift (UScalar.cast .Usize x)
+              ok (some i2)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for usize}]
-    Source: 'src/lib.rs', lines 350:0-354:1 -/
+    Source: 'src/lib.rs', lines 376:0-385:1 -/
 @[reducible]
 def Usize.Insts.ModinverseModInverse : ModInverse Std.Usize := {
   modinverse := Usize.Insts.ModinverseModInverse.modinverse
 }
 
-/-- [modinverse::{impl modinverse::ModInverse for isize}::modinverse::closure]
-    Source: 'src/lib.rs', lines 371:47-371:61 -/
-@[reducible]
-def ModInverseIsize.modinverse.closure := Unit
-
-/-- [modinverse::{impl modinverse::ModInverse for isize}::modinverse::{impl core::ops::function::FnOnce<(i64,), isize> for modinverse::{impl modinverse::ModInverse for isize}::modinverse::closure}::call_once]:
-    Source: 'src/lib.rs', lines 371:47-371:61 -/
-def
-  ModInverseIsize.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleI64Isize.call_once
-  (c : ModInverseIsize.modinverse.closure) (tupled_args : Std.I64) :
-  Result Std.Isize
-  := do
-  ok (IScalar.cast .Isize tupled_args)
-
-/-- Trait implementation: [modinverse::{impl modinverse::ModInverse for isize}::modinverse::{impl core::ops::function::FnOnce<(i64,), isize> for modinverse::{impl modinverse::ModInverse for isize}::modinverse::closure}]
-    Source: 'src/lib.rs', lines 371:47-371:61 -/
-@[reducible]
-def ModInverseIsize.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleI64Isize
-  : core.ops.function.FnOnce ModInverseIsize.modinverse.closure Std.I64
-  Std.Isize := {
-  call_once :=
-    ModInverseIsize.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleI64Isize.call_once
-}
-
 /-- [modinverse::{impl modinverse::ModInverse for isize}::modinverse]:
-    Source: 'src/lib.rs', lines 370:4-372:5
+    Source: 'src/lib.rs', lines 413:4-418:5
     Visibility: public -/
 def Isize.Insts.ModinverseModInverse.modinverse
   (self : Std.Isize) (m : Std.Isize) : Result (Option Std.Isize) := do
   let i ← lift (IScalar.cast .I64 self)
   let i1 ← lift (IScalar.cast .I64 m)
   let o ← I64.Insts.ModinverseModInverse.modinverse i i1
-  core.option.Option.map
-    ModInverseIsize.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleI64Isize
-    o ()
+  match o with
+  | none => ok none
+  | some x => let i2 ← lift (IScalar.cast .Isize x)
+              ok (some i2)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for isize}]
-    Source: 'src/lib.rs', lines 369:0-373:1 -/
+    Source: 'src/lib.rs', lines 410:0-419:1 -/
 @[reducible]
 def Isize.Insts.ModinverseModInverse : ModInverse Std.Isize := {
   modinverse := Isize.Insts.ModinverseModInverse.modinverse

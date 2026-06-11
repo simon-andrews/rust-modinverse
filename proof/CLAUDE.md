@@ -24,11 +24,12 @@ the pieces compose lives in the header comment of `ModInverse.lean` — read it 
 
 ## Trusted computing base
 
-The proof depends only on Lean's standard axioms plus the postulates in
-`ModInverse/Extern.lean` (the `unsigned_abs` / `Option::map` symbols Aeneas left opaque — see
-[`../extraction/CLAUDE.md`](../extraction/CLAUDE.md)). The unsigned results depend on *none* of
-the Extern axioms. `Gate.lean` audits this mechanically: `#assert_axioms` fails the build on
-any axiom outside its per-certificate allowlists, `sorryAx` included.
+Every certificate depends on exactly Lean's three standard axioms (`propext`,
+`Classical.choice`, `Quot.sound`): the extraction has no opaque symbols, so nothing about the
+machine code is postulated and `ModInverse/Extern.lean` is empty. It stays as the one
+designated home should a future opaque symbol need a trusted spec — see its header for the
+policy. `Gate.lean` audits all this mechanically: `#assert_axioms` fails the build on any
+axiom outside its per-certificate allowlists, `sorryAx` included.
 
 **`Extern.lean` is the one home for opaque-symbol postulates.** Any `core`/`std`/`alloc` symbol
 Charon/Aeneas leaves opaque in `extraction/Machine.lean` gets its trusted spec there and nowhere

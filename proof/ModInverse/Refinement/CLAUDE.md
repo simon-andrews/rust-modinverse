@@ -11,7 +11,8 @@ audited by `../Refinement.lean`; see [`../CLAUDE.md`](../CLAUDE.md) for where th
 - `Unsigned.lean` — `modinverse_u8 … u128`, ending in the generic composition lemma
   `composeUnsigned` and the certificates `modinverse_uN_correct`.
 - `Signed.lean` — `modinverse_i8 … i128` on the canonicalized input, ending in `composeSigned`
-  and `modinverse_iN_correct`. Uses the `Extern` axioms (`unsigned_abs`, `Option.map`).
+  and `modinverse_iN_correct`. The extracted `|x|` (a cast plus wrapping negate) is verified at
+  the two's-complement bit level in the `neg_abs_uN` lemmas — no postulates anywhere.
 - `Platform.lean` — `usize` / `isize`, dispatching to the 64-bit width, ending in their
   certificates.
 

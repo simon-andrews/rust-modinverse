@@ -269,21 +269,37 @@ impl_modinverse_unsigned!(u64, modinverse_u64);
 impl_modinverse_unsigned!(u128, modinverse_u128);
 
 // Signed impls canonicalize `self` into `[0, |m|)` over the unsigned type, run the unsigned core,
-// and cast the in-range result back. This is panic-free even at `T::MIN`: `unsigned_abs()` never
-// overflows, and any returned inverse lies in `[0, |m|)` and is coprime to `|m|`. When
-// `m == T::MIN`, `|m| = 2^(N-1)` does not fit in `T`, but it is excluded by the strict upper
-// bound and could never be coprime anyway, so the cast back is lossless even then.
+// and cast the in-range result back. This is panic-free even at `T::MIN`: the absolute value is
+// taken in wrapping unsigned arithmetic, so it never overflows, and any returned inverse lies in
+// `[0, |m|)` and is coprime to `|m|`. When `m == T::MIN`, `|m| = 2^(N-1)` does not fit in `T`,
+// but it is excluded by the strict upper bound and could never be coprime anyway, so the cast
+// back is lossless even then.
+//
+// `|x|` is spelled cast-then-negate (`0 - x` wrapping in the unsigned type) rather than
+// `x.unsigned_abs()`, and the result is rebuilt with a `match` rather than `Option::map`: both
+// `unsigned_abs` and `map` are `core` symbols Charon/Aeneas leaves opaque, and these spellings
+// keep the whole body inside the mechanically verified subset with no postulates.
 macro_rules! impl_modinverse_signed {
     ($t:ty, $ut:ty, $core:ident) => {
         impl ModInverse for $t {
+            // The `match` below is a deliberate manual `Option::map` — see the comment above.
+            #[allow(clippy::manual_map)]
             fn modinverse(self, m: Self) -> Option<Self> {
                 if m == 0 {
                     return None;
                 }
-                let m_abs: $ut = m.unsigned_abs();
-                let a_abs = self.unsigned_abs() % m_abs;
+                let m_abs: $ut = if m < 0 { (0 as $ut).wrapping_sub(m as $ut) } else { m as $ut };
+                let s_abs: $ut = if self < 0 {
+                    (0 as $ut).wrapping_sub(self as $ut)
+                } else {
+                    self as $ut
+                };
+                let a_abs = s_abs % m_abs;
                 let a_u = if self < 0 && a_abs != 0 { m_abs - a_abs } else { a_abs };
-                $core(a_u, m_abs).map(|x| x as $t)
+                match $core(a_u, m_abs) {
+                    Some(x) => Some(x as $t),
+                    None => None,
+                }
             }
         }
     };
@@ -336,39 +352,69 @@ compile_error!(
 
 #[cfg(target_pointer_width = "16")]
 impl ModInverse for usize {
+    // Manual `Option::map`: keeps the body Charon/Aeneas-lowerable (`map` is left opaque).
+    #[allow(clippy::manual_map)]
     fn modinverse(self, m: Self) -> Option<Self> {
-        (self as u16).modinverse(m as u16).map(|x| x as usize)
+        match (self as u16).modinverse(m as u16) {
+            Some(x) => Some(x as usize),
+            None => None,
+        }
     }
 }
 #[cfg(target_pointer_width = "32")]
 impl ModInverse for usize {
+    // Manual `Option::map`: keeps the body Charon/Aeneas-lowerable (`map` is left opaque).
+    #[allow(clippy::manual_map)]
     fn modinverse(self, m: Self) -> Option<Self> {
-        (self as u32).modinverse(m as u32).map(|x| x as usize)
+        match (self as u32).modinverse(m as u32) {
+            Some(x) => Some(x as usize),
+            None => None,
+        }
     }
 }
 #[cfg(target_pointer_width = "64")]
 impl ModInverse for usize {
+    // Manual `Option::map`: keeps the body Charon/Aeneas-lowerable (`map` is left opaque).
+    #[allow(clippy::manual_map)]
     fn modinverse(self, m: Self) -> Option<Self> {
-        (self as u64).modinverse(m as u64).map(|x| x as usize)
+        match (self as u64).modinverse(m as u64) {
+            Some(x) => Some(x as usize),
+            None => None,
+        }
     }
 }
 
 #[cfg(target_pointer_width = "16")]
 impl ModInverse for isize {
+    // Manual `Option::map`: keeps the body Charon/Aeneas-lowerable (`map` is left opaque).
+    #[allow(clippy::manual_map)]
     fn modinverse(self, m: Self) -> Option<Self> {
-        (self as i16).modinverse(m as i16).map(|x| x as isize)
+        match (self as i16).modinverse(m as i16) {
+            Some(x) => Some(x as isize),
+            None => None,
+        }
     }
 }
 #[cfg(target_pointer_width = "32")]
 impl ModInverse for isize {
+    // Manual `Option::map`: keeps the body Charon/Aeneas-lowerable (`map` is left opaque).
+    #[allow(clippy::manual_map)]
     fn modinverse(self, m: Self) -> Option<Self> {
-        (self as i32).modinverse(m as i32).map(|x| x as isize)
+        match (self as i32).modinverse(m as i32) {
+            Some(x) => Some(x as isize),
+            None => None,
+        }
     }
 }
 #[cfg(target_pointer_width = "64")]
 impl ModInverse for isize {
+    // Manual `Option::map`: keeps the body Charon/Aeneas-lowerable (`map` is left opaque).
+    #[allow(clippy::manual_map)]
     fn modinverse(self, m: Self) -> Option<Self> {
-        (self as i64).modinverse(m as i64).map(|x| x as isize)
+        match (self as i64).modinverse(m as i64) {
+            Some(x) => Some(x as isize),
+            None => None,
+        }
     }
 }
 

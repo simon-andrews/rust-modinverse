@@ -13,9 +13,10 @@ Two notes that aren't obvious from the file:
 - It is named `Machine.lean` (not `Modinverse.lean` as Aeneas emits) because `Modinverse` collides
   with the `ModInverse` proof root on case-insensitive filesystems (macOS). `just extract` does the
   rename.
-- Two `core` symbols Aeneas could not lower (`iN::unsigned_abs`, `Option::map`) appear as opaque
-  `axiom`s here. Their trusted behaviour is postulated in `proof/ModInverse/Extern.lean`, which is
-  part of the TCB.
+- It contains **no opaque `axiom`s**: the Rust spells everything the verified paths call inside
+  the subset Charon/Aeneas can lower (`|x|` is a cast plus `wrapping_sub`; `Option` results are
+  rebuilt with a `match`). If a future change reintroduces an opaque symbol, its trusted spec
+  belongs in `proof/ModInverse/Extern.lean` — see the policy there.
 
 It lives outside `proof/` on purpose: its one unused generic-egcd `sorry` must not trip the
 `just no-sorry` check, which only scans `proof/`.
