@@ -5,6 +5,11 @@ the pieces compose lives in the header comment of `ModInverse.lean` — read it 
 
 ## The human / AI boundary
 
+- **`Gate.lean` is human-maintained and trusted — the enforcement.** It re-types the 14
+  end-to-end certificates (`Refinement.modinverse_*_correct`) at frozen statements written in
+  trusted vocabulary only (extracted machine code + arithmetic, never the model), and its
+  `#assert_axioms` command fails the build if a certificate's axiom closure strays outside an
+  explicit allowlist. The only AI-workspace names it pins are those 14 certificates.
 - **`ModInverse.lean` is human-maintained and trusted — and holds *only the specification*.**
   `ModInverse.Spec.Correct` (what "a correct modular inverse" means) and `HelpersCompute`. No
   algorithm, no proofs. To judge whether the crate is proven correct, read *only* this file: are
@@ -21,9 +26,9 @@ the pieces compose lives in the header comment of `ModInverse.lean` — read it 
 
 The proof depends only on Lean's standard axioms plus the postulates in
 `ModInverse/Extern.lean` (the `unsigned_abs` / `Option::map` symbols Aeneas left opaque — see
-[`../extraction/CLAUDE.md`](../extraction/CLAUDE.md)). The unsigned `u128` result depends on
-*none* of the Extern axioms. `ModInverse/Refinement.lean` ends with `#print axioms` calls that
-audit this; never let a `sorryAx` appear there.
+[`../extraction/CLAUDE.md`](../extraction/CLAUDE.md)). The unsigned results depend on *none* of
+the Extern axioms. `Gate.lean` audits this mechanically: `#assert_axioms` fails the build on
+any axiom outside its per-certificate allowlists, `sorryAx` included.
 
 **`Extern.lean` is the one home for opaque-symbol postulates.** Any `core`/`std`/`alloc` symbol
 Charon/Aeneas leaves opaque in `extraction/Machine.lean` gets its trusted spec there and nowhere
@@ -36,6 +41,9 @@ TCB in one auditable place.
   `ModInverse.*` proof modules explicitly; the root `ModInverse.lean` does not import them, so
   without the glob `lake build` would silently skip every proof.
 - `just no-sorry` — there must be no `sorry` anywhere in `proof/`.
+- `just no-rogue-axioms` — no `axiom` in the AI workspace outside `ModInverse/Extern.lean`.
+- `just trusted-unchanged` — the trusted files (spec, gate, Extern) must match their pinned
+  hashes in `proof/trusted.sha256`; a human edit to a trusted file updates the hash with it.
 - The **lean-lsp MCP** (`.mcp.json`) is the fast way to inspect goals/diagnostics while editing
   proofs — prefer it over repeated `lake build`, which is slow.
 

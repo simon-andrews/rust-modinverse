@@ -20,9 +20,9 @@
   a proof or refinement file, and never weaken a real definition into an axiom to make
   a proof go through. Each addition expands the TCB, so for every axiom: (1) state it
   as the faithful Rust semantics with a justifying comment, (2) keep it `@[step]` if
-  the refinement should pick it up automatically, and (3) make sure the
-  `#print axioms` audit in `Refinement.lean` still shows *only* this file's axioms
-  plus Lean's standard three — never `sorryAx`.
+  the refinement should pick it up automatically, and (3) ask the human to add it to
+  the affected allowlists in the trusted `Gate.lean` — its `#assert_axioms` audit
+  fails the build on any axiom it has not approved, including `sorryAx`.
 
   The unsigned path (`ModInverse.isCorrect`, `modinverse_u128_correct`) does **not**
   depend on this file and stays clean of these axioms.

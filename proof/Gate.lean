@@ -1,0 +1,171 @@
+/-
+  # The gate: what the proof must always deliver    ★ HUMAN-MAINTAINED · TRUSTED ★
+
+  This file is the enforcement half of the trusted surface (the meaning half is the
+  spec in `ModInverse.lean`). It pins down — in trusted vocabulary only: the
+  Aeneas-extracted machine code in `../extraction/Machine.lean`, Aeneas's scalar and
+  `Result` types, and plain arithmetic — what the AI workspace must always deliver,
+  and it **fails the build** if any of it is missing:
+
+    * For each of the 14 public `ModInverse` impls (`u8`–`u128`, `i8`–`i128`,
+      `usize`, `isize`), the extracted trait method is a correct modular inverse:
+      it never errors, a returned witness really is an inverse and is the canonical
+      representative, a witness is returned whenever one exists, and `None` comes
+      back in exactly the no-inverse cases. The statements (`UnsignedCorrect` /
+      `SignedCorrect` below) belong to this file; the workspace must produce terms
+      of exactly these types — they cannot be weakened from the outside.
+
+    * Each certificate's axiom closure is inside an explicit allowlist: Lean's
+      three standard axioms, plus — for the signed and platform widths only — the
+      `ModInverse/Extern.lean` postulates for the two `core` symbols Charon/Aeneas
+      leaves opaque, and those opaque symbols themselves. In particular **no
+      `sorryAx` and no rogue `axiom` can hide anywhere in a certificate's proof**:
+      unlike the informational `#print axioms`, `#assert_axioms` fails the build.
+
+  The only AI-workspace names this file mentions are the 14 final certificates
+  (`Refinement.modinverse_*_correct`). Everything else — file layout, the model,
+  lemma structure, proof style — remains entirely the AI's to rearrange. Renaming a
+  certificate is an interface change and requires a human edit here; that is the
+  point.
+
+  Like the spec, this file is frozen: `just trusted-unchanged` checks its hash.
+-/
+
+import Lean
+import ModInverse
+import ModInverse.Refinement
+
+/-! ## The audit command -/
+
+open Lean Elab Command in
+/-- `#assert_axioms thm [ax₁, ax₂, …]` **fails the build** unless every axiom in
+    `thm`'s closure is one of the listed allowed axioms. -/
+elab "#assert_axioms " id:ident " [" allowed:ident,* "]" : command => do
+  let declName ← resolveGlobalConstNoOverload id
+  let allowedNames ← allowed.getElems.toList.mapM fun a =>
+    resolveGlobalConstNoOverload a
+  let axioms ← liftCoreM <| collectAxioms declName
+  let bad := axioms.filter fun ax => !allowedNames.contains ax
+  unless bad.isEmpty do
+    throwError "axiom audit failed for '{declName}': disallowed axioms {bad.toList}"
+
+namespace Gate
+
+open Aeneas Aeneas.Std Result
+open modinverse
+
+/-! ## The trusted statements
+
+  These mirror the four fields of `ModInverse.Spec.Correct` at the machine level.
+  `UnsignedCorrect` reads over `ℕ` (`.val` of an unsigned scalar); `SignedCorrect`
+  reads over `ℤ`, with the witness in the canonical range `[0, |m|)`. -/
+
+/-- An extracted unsigned `modinverse` at width `w` is correct: it never errors
+    (`⦃ ⦄` asserts every run is `ok`), a returned witness really is an inverse,
+    the witness is the canonical representative in `[0, m)`, a witness is produced
+    whenever one exists, and `none` is returned in exactly the no-inverse cases. -/
+def UnsignedCorrect (w : UScalarTy)
+    (f : UScalar w → UScalar w → Result (Option (UScalar w))) : Prop :=
+  ∀ a m : UScalar w,
+    f a m ⦃ (r : Option (UScalar w)) =>
+      (∀ s, r = some s → a.val * s.val ≡ 1 [MOD m.val]) ∧
+      (∀ s, r = some s → 0 < m.val → s.val < m.val) ∧
+      (0 < m.val → Nat.Coprime a.val m.val → ∃ s, r = some s) ∧
+      (r = none ↔ m.val = 0 ∨ ¬ Nat.Coprime a.val m.val) ⦄
+
+/-- An extracted signed `modinverse` at width `w` is correct, over `ℤ`: it never
+    errors, a returned witness really is an inverse, the witness is the canonical
+    representative in `[0, |m|)`, a witness is produced whenever one exists, and
+    `none` is returned in exactly the no-inverse cases. -/
+def SignedCorrect (w : IScalarTy)
+    (f : IScalar w → IScalar w → Result (Option (IScalar w))) : Prop :=
+  ∀ a m : IScalar w,
+    f a m ⦃ (r : Option (IScalar w)) =>
+      (∀ s, r = some s → a.val * s.val ≡ 1 [ZMOD m.val]) ∧
+      (∀ s, r = some s → 0 ≤ s.val ∧ s.val < m.val.natAbs) ∧
+      (m.val ≠ 0 → Int.gcd a.val m.val = 1 → ∃ s, r = some s) ∧
+      (r = none ↔ m.val = 0 ∨ Int.gcd a.val m.val ≠ 1) ⦄
+
+/-! ## The 14 certificates, anchored
+
+  Each `theorem` below re-types an AI-workspace certificate at this file's trusted
+  statement (the two must be definitionally identical or the build fails), then
+  `#assert_axioms` pins its axiom closure. -/
+
+/-! ### Unsigned: depend on nothing beyond Lean's standard axioms -/
+
+theorem u8_correct : UnsignedCorrect .U8 U8.Insts.ModinverseModInverse.modinverse :=
+  Refinement.modinverse_u8_correct
+#assert_axioms u8_correct [propext, Classical.choice, Quot.sound]
+
+theorem u16_correct : UnsignedCorrect .U16 U16.Insts.ModinverseModInverse.modinverse :=
+  Refinement.modinverse_u16_correct
+#assert_axioms u16_correct [propext, Classical.choice, Quot.sound]
+
+theorem u32_correct : UnsignedCorrect .U32 U32.Insts.ModinverseModInverse.modinverse :=
+  Refinement.modinverse_u32_correct
+#assert_axioms u32_correct [propext, Classical.choice, Quot.sound]
+
+theorem u64_correct : UnsignedCorrect .U64 U64.Insts.ModinverseModInverse.modinverse :=
+  Refinement.modinverse_u64_correct
+#assert_axioms u64_correct [propext, Classical.choice, Quot.sound]
+
+theorem u128_correct : UnsignedCorrect .U128 U128.Insts.ModinverseModInverse.modinverse :=
+  Refinement.modinverse_u128_correct
+#assert_axioms u128_correct [propext, Classical.choice, Quot.sound]
+
+/-! ### Signed: additionally allowed the `Extern` postulates for the two opaque
+    `core` symbols (`iN::unsigned_abs`, `Option::map`) and those symbols
+    themselves — see `ModInverse/Extern.lean` -/
+
+theorem i8_correct : SignedCorrect .I8 I8.Insts.ModinverseModInverse.modinverse :=
+  Refinement.modinverse_i8_correct
+#assert_axioms i8_correct [propext, Classical.choice, Quot.sound,
+  ModInverse.Extern.I8.unsigned_abs_spec, modinverse.core.num.I8.unsigned_abs,
+  ModInverse.Extern.Option_map_none, ModInverse.Extern.Option_map_some,
+  modinverse.core.option.Option.map]
+
+theorem i16_correct : SignedCorrect .I16 I16.Insts.ModinverseModInverse.modinverse :=
+  Refinement.modinverse_i16_correct
+#assert_axioms i16_correct [propext, Classical.choice, Quot.sound,
+  ModInverse.Extern.I16.unsigned_abs_spec, modinverse.core.num.I16.unsigned_abs,
+  ModInverse.Extern.Option_map_none, ModInverse.Extern.Option_map_some,
+  modinverse.core.option.Option.map]
+
+theorem i32_correct : SignedCorrect .I32 I32.Insts.ModinverseModInverse.modinverse :=
+  Refinement.modinverse_i32_correct
+#assert_axioms i32_correct [propext, Classical.choice, Quot.sound,
+  ModInverse.Extern.I32.unsigned_abs_spec, modinverse.core.num.I32.unsigned_abs,
+  ModInverse.Extern.Option_map_none, ModInverse.Extern.Option_map_some,
+  modinverse.core.option.Option.map]
+
+theorem i64_correct : SignedCorrect .I64 I64.Insts.ModinverseModInverse.modinverse :=
+  Refinement.modinverse_i64_correct
+#assert_axioms i64_correct [propext, Classical.choice, Quot.sound,
+  ModInverse.Extern.I64.unsigned_abs_spec, modinverse.core.num.I64.unsigned_abs,
+  ModInverse.Extern.Option_map_none, ModInverse.Extern.Option_map_some,
+  modinverse.core.option.Option.map]
+
+theorem i128_correct : SignedCorrect .I128 I128.Insts.ModinverseModInverse.modinverse :=
+  Refinement.modinverse_i128_correct
+#assert_axioms i128_correct [propext, Classical.choice, Quot.sound,
+  ModInverse.Extern.I128.unsigned_abs_spec, modinverse.core.num.I128.unsigned_abs,
+  ModInverse.Extern.Option_map_none, ModInverse.Extern.Option_map_some,
+  modinverse.core.option.Option.map]
+
+/-! ### Platform widths: dispatch to the 64-bit width -/
+
+theorem usize_correct : UnsignedCorrect .Usize Usize.Insts.ModinverseModInverse.modinverse :=
+  Refinement.modinverse_usize_correct
+#assert_axioms usize_correct [propext, Classical.choice, Quot.sound,
+  ModInverse.Extern.Option_map_none, ModInverse.Extern.Option_map_some,
+  modinverse.core.option.Option.map]
+
+theorem isize_correct : SignedCorrect .Isize Isize.Insts.ModinverseModInverse.modinverse :=
+  Refinement.modinverse_isize_correct
+#assert_axioms isize_correct [propext, Classical.choice, Quot.sound,
+  ModInverse.Extern.I64.unsigned_abs_spec, modinverse.core.num.I64.unsigned_abs,
+  ModInverse.Extern.Option_map_none, ModInverse.Extern.Option_map_some,
+  modinverse.core.option.Option.map]
+
+end Gate

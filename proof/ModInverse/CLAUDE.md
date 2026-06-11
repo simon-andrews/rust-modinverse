@@ -7,8 +7,10 @@ is the index.
 
 **You own this directory's structure.** The layout below is the current state, not a mandate —
 split, merge, rename, or rethink the proof however works best. The only fixed contracts are the
-spec in `../ModInverse.lean` and the discipline at the bottom (no `sorry`; no axioms outside
-`Extern.lean`; the `#print axioms` audit stays clean).
+spec in `../ModInverse.lean`, the gate in `../Gate.lean` (it re-types the 14 certificates
+`Refinement.modinverse_*_correct` at frozen statements and audits their axiom closures,
+build-failingly — so those 14 names and types must keep existing), and the discipline at the
+bottom (no `sorry`; no axioms outside `Extern.lean`).
 
 The **model itself lives here**, not in the trusted root: `Model.lean` is the `ℕ` transcription of
 `src/lib.rs`. It is a *target*, not trusted — refinement proves the real code matches it — so it
@@ -29,20 +31,22 @@ may be freely rewritten as long as both obligations below still discharge agains
 **Machine code refines model** — over the Aeneas extraction:
 
 - `Refinement/` — every `modinverse_{u,i}N` / `usize` / `isize` never errors and value-matches the
-  model. This is the Aeneas-tactic half; it has its own conventions, see
+  model, then composes with `isCorrect` into the per-width certificates `modinverse_*_correct`.
+  This is the Aeneas-tactic half; it has its own conventions, see
   [`Refinement/CLAUDE.md`](Refinement/CLAUDE.md).
-- `Refinement.lean` — aggregates the `Refinement/*` modules and runs the `#print axioms` audit.
+- `Refinement.lean` — aggregates the `Refinement/*` modules.
 - `Extern.lean` — **★ TRUSTED ★** the postulated specs for `core`/`std` symbols Aeneas left opaque
   (TCB; see `../CLAUDE.md`). This is the *one* home for such postulates — any future opaque symbol's
   spec goes here and nowhere else.
 
 Composing refinement (machine refines model) with `isCorrect` (model meets spec) certifies the
-real extracted code — that composition is `modinverse_u128_correct` / `modinverse_i128_correct`.
+real extracted code — that composition is the 14 `modinverse_*_correct` certificates, one per
+public `ModInverse` impl, which the trusted `../Gate.lean` re-types and audits.
 
 ## Discipline
 
 - **No `sorry`, no new `axiom`.** The only axioms in the whole development are `Extern.lean`'s;
-  anything else (especially `sorryAx`) breaks the audit in `Refinement.lean`.
+  anything else (especially `sorryAx`) fails the `#assert_axioms` audit in `../Gate.lean`.
 - **Certificates are `structure` instances.** Because `Spec.Correct` is a structure, a certificate
   fails to typecheck unless every field is discharged at *exactly* its declared type — proofs
   cannot silently drift from the statements. To add a guarantee, add a `Spec` field in the root;

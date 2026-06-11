@@ -21,10 +21,11 @@
   and checked end to end by the kernel. *How* that proof is structured is entirely up
   to the AI.
 
-  The trusted computing base is exactly: this spec, Lean's kernel and standard axioms,
-  the Charon/Aeneas pipeline, and any postulates for `core`/`std` symbols Aeneas
-  cannot lower (the AI collects these in `ModInverse/Extern.lean`, where a
-  `#print axioms` audit keeps them visible). The unsigned path needs none of the last.
+  The trusted computing base is exactly: this spec, the gate (`Gate.lean`, which
+  re-types the final certificates at frozen statements and fails the build on any
+  unapproved axiom), Lean's kernel and standard axioms, the Charon/Aeneas pipeline,
+  and any postulates for `core`/`std` symbols Aeneas cannot lower (the AI collects
+  these in `ModInverse/Extern.lean`). The unsigned path needs none of the last.
 
   ## The specification: what "correct" means
 

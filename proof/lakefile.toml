@@ -1,5 +1,5 @@
 name = "modinverse"
-defaultTargets = ["ModInverse"]
+defaultTargets = ["ModInverse", "Gate"]
 
 # Pinned to match the Aeneas Lean backend (Lean 4.30.0-rc2 + mathlib v4.30.0-rc2),
 # so the Aeneas-extracted machine model and the hand model live in one project.
@@ -23,6 +23,11 @@ name = "ModInverse"
 # AI-maintained model and proofs under `ModInverse/`, so glob them in explicitly —
 # otherwise `lake build` would compile only the root and silently skip every proof.
 globs = ["ModInverse", "ModInverse.*"]
+
+# The gate (trusted, human-maintained): re-types the 14 end-to-end certificates at
+# frozen statements and fails the build on any disallowed axiom in their closures.
+[[lean_lib]]
+name = "Gate"
 
 # The Aeneas-extracted machine code (`charon` + `aeneas`) is the sole machine-
 # generated source and lives outside the proof tree, in `../extraction`, so the
