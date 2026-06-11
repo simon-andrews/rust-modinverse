@@ -1,0 +1,11 @@
+# The trusted surface: changes here change what "proven correct" means, so they
+# require the human's review. Everything else under proof/ModInverse/ is the AI's
+# workspace, kept honest by the gate rather than by review.
+/proof/ModInverse.lean      @simon-andrews
+/proof/Gate.lean            @simon-andrews
+/proof/ModInverse/Extern.lean @simon-andrews
+/proof/trusted.sha256       @simon-andrews
+
+# The enforcement plumbing itself.
+/justfile                   @simon-andrews
+/.github/                   @simon-andrews

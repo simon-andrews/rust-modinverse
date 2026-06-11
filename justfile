@@ -22,3 +22,13 @@ extract:
 # Fail if any sorry remains in the proof.
 no-sorry:
     ! grep -RnE '\bsorry\b' --include='*.lean' --exclude-dir=.lake proof/ | grep -vF '`sorry`'
+
+# Fail if an axiom appears in the AI workspace outside its one designated TCB home,
+# Extern.lean. (The trusted root files are covered by trusted-unchanged instead.)
+no-rogue-axioms:
+    ! grep -RnE '\baxiom\b' --include='*.lean' proof/ModInverse/ | grep -vF '`axiom`' | grep -v '^proof/ModInverse/Extern.lean:'
+
+# Fail if a trusted file (the spec, the gate, the Extern postulates) changed without
+# its pinned hash being deliberately updated alongside it.
+trusted-unchanged:
+    cd proof && shasum -a 256 --check trusted.sha256

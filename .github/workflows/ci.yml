@@ -5,6 +5,15 @@ on:
   pull_request:
 
 jobs:
+  check-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: extractions/setup-just@v2
+      - run: just no-sorry
+      - run: just no-rogue-axioms
+      - run: just trusted-unchanged
+
   check-rust:
     runs-on: ubuntu-latest
     steps:
@@ -28,4 +37,3 @@ jobs:
           build: false
       - uses: extractions/setup-just@v2
       - run: just prove-correctness
-      - run: just no-sorry

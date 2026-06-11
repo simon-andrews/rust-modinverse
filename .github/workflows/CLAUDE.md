@@ -1,7 +1,9 @@
 # .github/workflows/ — CI
 
-`ci.yml` runs the Rust gate (`just check`) and the Lean gate (`just prove-correctness` +
-`just no-sorry`) on every push and PR. `publish.yml` runs `cargo publish` on `v*` tags after
+`ci.yml` runs the cheap text gates (`just no-sorry`, `just no-rogue-axioms`,
+`just trusted-unchanged`), the Rust gate (`just check`), and the Lean gate
+(`just prove-correctness`, which builds the proof *and* the trusted `Gate` axiom audit) on
+every push and PR. `publish.yml` runs `cargo publish` on `v*` tags after
 verifying the tag matches the `Cargo.toml` version.
 
 The workflows deliberately delegate to `justfile` recipes so local and CI runs share one
