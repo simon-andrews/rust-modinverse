@@ -1,18 +1,19 @@
 /-
   # Proofs: discharging the targets (AI-MAINTAINED)
 
-  Every declaration here exists to satisfy a target in `ModInverse/Targets.lean`.
-  Do not weaken any statement: the trusted statements live in `Targets.lean`, and
-  the certificates at the bottom (`isCorrect`, `helpersCompute`) must produce
-  terms of exactly those types. If a proof here is incomplete the whole library
-  fails to build — there is no `sorry` and no `axiom`.
+  Every declaration here exists to satisfy a target in `ModInverse.Spec` (the
+  human-maintained spec in the root `ModInverse.lean`). Do not weaken any statement:
+  the trusted statements live there, and the certificates at the bottom (`isCorrect`,
+  `helpersCompute`) must produce terms of exactly those types. If a proof here is
+  incomplete the whole library fails to build — there is no `sorry` and no `axiom`.
 
   The strategy: run the extended Euclidean algorithm with a loop invariant stated
   in `ZMod m` (so the per-step `% m` reductions become no-ops), then translate
   back to `Nat`-level congruences at the end.
 -/
 
-import ModInverse.Targets
+import ModInverse
+import ModInverse.Model
 import Mathlib.Data.Int.GCD
 import Mathlib.Data.ZMod.Basic
 import Mathlib.Tactic

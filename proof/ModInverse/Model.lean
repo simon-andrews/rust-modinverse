@@ -1,26 +1,20 @@
 /-
-  # Model: the algorithm under verification
+  # The algorithm under verification, as an `ℕ` model      ☆ AI-MAINTAINED ☆
 
-  TRANSLATION LAYER. This file defines, in Lean 4 (ℕ), the algorithm that the
-  fixed-width modular-inverse impls in `src/lib.rs` compute, plus ℕ models of the
-  two overflow-avoiding `u128` helpers. It contains **definitions** and only the
-  minimal lemmas needed to state them (e.g. the `< m` bounds carried by `State`);
-  it makes **no standalone correctness claims**. What the definitions are
-  *supposed* to satisfy lives in `ModInverse/Targets.lean` (human-maintained); the
-  evidence that they do lives in `ModInverse/Proofs.lean` (AI-maintained).
-
-  This is a hand translation of the Rust, but its faithfulness is **not** taken on
-  inspection. `ModInverse/Refinement.lean` proves that the Aeneas extraction of
-  the real Rust (`extraction/Machine.lean`) refines this model, for every width
-  `u8`–`u128`: each extracted `modinverse_uN` never fails and its result matches
-  `modinverse` on `.val`. So this file is permanently the hand-written *spec
-  target*; it is never replaced by generated code.
+  TRANSLATION LAYER. The definitions below are a hand translation of the fixed-width
+  modular-inverse code in `src/lib.rs` into Lean over `ℕ`. Their faithfulness is
+  **not** taken on inspection: `ModInverse/Refinement/` proves that the Aeneas
+  extraction of the real Rust refines this model for every width. So the model is a
+  *target* the machine code is matched against — and because that match
+  (`code ⊑ model`) and the spec (`model ⊨ Spec.Correct`, in `Proofs.lean`) are both
+  machine-checked against the frozen `ModInverse.Spec` in the root, this file may be
+  rewritten freely: any version that still discharges both obligations is correct.
+  Only the spec is human-owned and trusted.
 
   Every fixed-width type runs the *same* per-step-reduced extended Euclidean
-  algorithm, so one ℕ model serves them all. The arithmetic core (`subMod`,
-  `step`, `loop`, `modinverse`) is width-independent. The `addMod`/`mulMod` defs
-  model the `u128` helpers specifically — narrow widths multiply by widening
-  instead — and `Proofs.lean` shows they compute ordinary `(a + b) % m`/`(a * b) % m`.
+  algorithm, so one `ℕ` model serves them all. The arithmetic core (`subMod`, `step`,
+  `loop`, `modinverse`) is width-independent. `addMod`/`mulMod` model the two
+  overflow-avoiding `u128` helpers (narrow widths multiply by widening instead).
 
   Rust → Lean mapping:
 
@@ -29,15 +23,17 @@
       fn mul_mod_u128(a, b, m)               def mulMod  (via mulModAux)
       one loop iteration                     def step
       `while r_next != 0 {...}`              def loop  (well-founded recursion on rNext)
-      `<u128 as ModInverse>::modinverse`     def modinverse  (extracted as modinverse_u128)
+      `<u128 as ModInverse>::modinverse`     def modinverse
 
-  Rust is fixed-width unsigned; this model is `ℕ`. The unsigned cores never
-  overflow, so a `ℕ` model captures the relevant semantics — and that no-overflow
-  fact is discharged by the refinement (the machine code is proved never to
-  `fail`), not asserted by inspection.
+  Rust is fixed-width unsigned; this model is `ℕ`. The unsigned cores never overflow,
+  so a `ℕ` model captures the relevant semantics — and that no-overflow fact is
+  discharged by the refinement (the machine code is proved never to `fail`), not
+  asserted by inspection.
 -/
 
 import Mathlib.Tactic
+import Mathlib.Data.Nat.GCD.Basic
+import Mathlib.Data.Nat.ModEq
 
 namespace ModInverse
 

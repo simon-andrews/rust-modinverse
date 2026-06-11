@@ -19,6 +19,10 @@ subDir = "backends/lean"
 
 [[lean_lib]]
 name = "ModInverse"
+# The root `ModInverse.lean` (human-maintained spec only) does not import the
+# AI-maintained model and proofs under `ModInverse/`, so glob them in explicitly —
+# otherwise `lake build` would compile only the root and silently skip every proof.
+globs = ["ModInverse", "ModInverse.*"]
 
 # The Aeneas-extracted machine code (`charon` + `aeneas`) is the sole machine-
 # generated source and lives outside the proof tree, in `../extraction`, so the
