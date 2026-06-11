@@ -325,55 +325,82 @@ theorem modinverse_i128_spec (a m : Std.I128) :
     rw [haabs]
     exact ModInverse.reduceSigned_eq_nonneg hMpos (by scalar_tac)
 
-/-! ## End-to-end correctness of the extracted signed `i128` machine code
+/-! ## End-to-end correctness of the extracted signed machine code
 
-  Composing `modinverse_i128_spec` (the machine refines the ℕ model on the canonicalized
-  input) with `ModInverse.isCorrect` (the model is a correct inverse) certifies the actual
-  extracted signed code, over `ℤ`: for `m ≠ 0`, `modinverse_i128` never errors, any
-  returned witness is a genuine inverse in the canonical range `[0, |m|)`, and a witness
-  is returned whenever one exists. The other signed widths (`i8`–`i64`, `isize`) compose
-  identically. -/
+  Composing the per-width refinement (`modinverse_iN_spec`: machine refines the ℕ
+  model on the canonicalized input) with `ModInverse.isCorrect` certifies the
+  *actual extracted signed code*, stated over the public trait methods
+  (`<iN as ModInverse>::modinverse` in the Rust) with no reference to the model:
+  the four clauses of `SignedMachineCorrect` transport the four fields of
+  `ModInverse.Spec.Correct` to the machine level, over `ℤ`, with the witness in
+  the canonical range `[0, |m|)`. One generic composition lemma serves every
+  signed width (and `isize`, in `Platform.lean`). -/
 
-/-- **The extracted signed `modinverse_i128` is a correct modular inverse over `ℤ`.** -/
-theorem modinverse_i128_correct (a m : Std.I128) (hm : m.val ≠ 0) :
-    I128.Insts.ModinverseModInverse.modinverse a m ⦃ (r : Option Std.I128) =>
-      -- soundness: a returned witness really is an inverse of `a` modulo `m`
-      (∀ s : Std.I128, r = some s → a.val * s.val ≡ 1 [ZMOD m.val]) ∧
-      -- bound: the witness is the canonical representative in `[0, |m|)`
-      (∀ s : Std.I128, r = some s → 0 ≤ s.val ∧ s.val < m.val.natAbs) ∧
-      -- completeness: an inverse is produced whenever one exists
-      (Int.gcd a.val m.val = 1 → ∃ s : Std.I128, r = some s) ⦄ := by
-  have hM : 0 < m.val.natAbs := Int.natAbs_pos.mpr hm
-  apply WP.spec_mono (modinverse_i128_spec a m)
+/-- The machine-level reading of `ModInverse.Spec.Correct` for an extracted
+    signed `modinverse` at width `w`, over `ℤ`: it never errors, a returned
+    witness is a real inverse and the canonical representative in `[0, |m|)`, a
+    witness is produced whenever one exists, and `none` is returned in exactly
+    the no-inverse cases. -/
+def SignedMachineCorrect (w : IScalarTy)
+    (f : IScalar w → IScalar w → Result (Option (IScalar w))) : Prop :=
+  ∀ a m : IScalar w,
+    f a m ⦃ (r : Option (IScalar w)) =>
+      -- sound: a returned witness really is an inverse
+      (∀ s, r = some s → a.val * s.val ≡ 1 [ZMOD m.val]) ∧
+      -- bounded: the witness is the canonical representative in `[0, |m|)`
+      (∀ s, r = some s → 0 ≤ s.val ∧ s.val < m.val.natAbs) ∧
+      -- complete: an inverse is produced whenever one exists
+      (m.val ≠ 0 → Int.gcd a.val m.val = 1 → ∃ s, r = some s) ∧
+      -- fails exactly: `none` in exactly the no-inverse cases
+      (r = none ↔ m.val = 0 ∨ Int.gcd a.val m.val ≠ 1) ⦄
+
+/-- Generic composition: any width whose machine code value-matches the ℕ model
+    on the canonicalized input is machine-correct, by `ModInverse.isCorrect` and
+    the `reduceSigned` bridge lemmas. -/
+theorem composeSigned {w : IScalarTy}
+    {f : IScalar w → IScalar w → Result (Option (IScalar w))}
+    (hf : ∀ a m : IScalar w,
+      f a m ⦃ (r : Option (IScalar w)) =>
+        r.map (·.val) =
+          (ModInverse.modinverse (ModInverse.reduceSigned a.val m.val.natAbs)
+            m.val.natAbs).map (Int.ofNat ·) ⦄) :
+    SignedMachineCorrect w f := by
+  intro a m
+  apply WP.spec_mono (hf a m)
   intro r hr
-  refine ⟨?_, ?_, ?_⟩
-  · -- soundness
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · -- sound (`m ≠ 0` is forced: for `m = 0` the model returns `none`)
     intro s hs
     subst hs
     simp only [Option.map_some] at hr
     rcases hmod : ModInverse.modinverse (ModInverse.reduceSigned a.val m.val.natAbs) m.val.natAbs
       with _ | k
     · rw [hmod] at hr; simp at hr
-    · rw [hmod] at hr
-      simp only [Option.map_some] at hr
-      have hsk : s.val = (k : ℤ) := by simpa using hr
-      have hsound := ModInverse.isCorrect.sound _ _ _ hmod
-      rw [hsk]
-      exact ModInverse.modEq_natAbs_iff.mpr (ModInverse.reduceSigned_sound hM hsound)
-  · -- bound
+    · rcases Nat.eq_zero_or_pos m.val.natAbs with h0 | hM
+      · rw [h0] at hmod; simp [ModInverse.modinverse] at hmod
+      · rw [hmod] at hr
+        simp only [Option.map_some] at hr
+        have hsk : s.val = (k : ℤ) := by simpa using hr
+        have hsound := ModInverse.isCorrect.sound _ _ _ hmod
+        rw [hsk]
+        exact ModInverse.modEq_natAbs_iff.mpr (ModInverse.reduceSigned_sound hM hsound)
+  · -- bounded
     intro s hs
     subst hs
     simp only [Option.map_some] at hr
     rcases hmod : ModInverse.modinverse (ModInverse.reduceSigned a.val m.val.natAbs) m.val.natAbs
       with _ | k
     · rw [hmod] at hr; simp at hr
-    · rw [hmod] at hr
-      simp only [Option.map_some] at hr
-      have hsk : s.val = (k : ℤ) := by simpa using hr
-      have hbnd := ModInverse.isCorrect.bounded _ _ _ hM hmod
-      exact ⟨by rw [hsk]; positivity, by rw [hsk]; exact_mod_cast hbnd⟩
-  · -- completeness
-    intro hgcd
+    · rcases Nat.eq_zero_or_pos m.val.natAbs with h0 | hM
+      · rw [h0] at hmod; simp [ModInverse.modinverse] at hmod
+      · rw [hmod] at hr
+        simp only [Option.map_some] at hr
+        have hsk : s.val = (k : ℤ) := by simpa using hr
+        have hbnd := ModInverse.isCorrect.bounded _ _ _ hM hmod
+        exact ⟨by rw [hsk]; positivity, by rw [hsk]; exact_mod_cast hbnd⟩
+  · -- complete
+    intro hm hgcd
+    have hM : 0 < m.val.natAbs := Int.natAbs_pos.mpr hm
     have hcop : Nat.Coprime (ModInverse.reduceSigned a.val m.val.natAbs) m.val.natAbs :=
       ModInverse.coprime_reduceSigned hM hgcd
     obtain ⟨k, hk⟩ :=
@@ -383,5 +410,64 @@ theorem modinverse_i128_correct (a m : Std.I128) (hm : m.val ≠ 0) :
     cases r with
     | none => simp at hr
     | some s => exact ⟨s, rfl⟩
+  · -- fails exactly
+    constructor
+    · intro hnone
+      rw [hnone] at hr
+      have hmodel :
+          ModInverse.modinverse (ModInverse.reduceSigned a.val m.val.natAbs) m.val.natAbs
+            = none := by
+        rcases hmod : ModInverse.modinverse (ModInverse.reduceSigned a.val m.val.natAbs)
+            m.val.natAbs with _ | k
+        · rfl
+        · rw [hmod] at hr; simp at hr
+      by_cases hm : m.val = 0
+      · exact Or.inl hm
+      · have hM : 0 < m.val.natAbs := Int.natAbs_pos.mpr hm
+        rcases (ModInverse.isCorrect.failsExactly _ _).mp hmodel with h0 | hncop
+        · exact absurd h0 hM.ne'
+        · exact Or.inr fun hgcd => hncop (ModInverse.coprime_reduceSigned hM hgcd)
+    · intro hcase
+      have hmodel :
+          ModInverse.modinverse (ModInverse.reduceSigned a.val m.val.natAbs) m.val.natAbs
+            = none := by
+        apply (ModInverse.isCorrect.failsExactly _ _).mpr
+        by_cases hm : m.val = 0
+        · exact Or.inl (by simp [hm])
+        · have hM : 0 < m.val.natAbs := Int.natAbs_pos.mpr hm
+          rcases hcase with h0 | hgcd
+          -- `m = 0` was just excluded, so the gcd branch is the live one
+          · exact absurd h0 hm
+          · refine Or.inr fun hcop => hgcd ?_
+            show a.val.natAbs.gcd m.val.natAbs = 1
+            rw [← ModInverse.gcd_reduceSigned hM]
+            exact hcop
+      rw [hmodel] at hr
+      simpa using hr
+
+/-- **The extracted `<i8 as ModInverse>::modinverse` is a correct modular inverse over `ℤ`.** -/
+theorem modinverse_i8_correct :
+    SignedMachineCorrect .I8 I8.Insts.ModinverseModInverse.modinverse :=
+  composeSigned modinverse_i8_spec
+
+/-- **The extracted `<i16 as ModInverse>::modinverse` is a correct modular inverse over `ℤ`.** -/
+theorem modinverse_i16_correct :
+    SignedMachineCorrect .I16 I16.Insts.ModinverseModInverse.modinverse :=
+  composeSigned modinverse_i16_spec
+
+/-- **The extracted `<i32 as ModInverse>::modinverse` is a correct modular inverse over `ℤ`.** -/
+theorem modinverse_i32_correct :
+    SignedMachineCorrect .I32 I32.Insts.ModinverseModInverse.modinverse :=
+  composeSigned modinverse_i32_spec
+
+/-- **The extracted `<i64 as ModInverse>::modinverse` is a correct modular inverse over `ℤ`.** -/
+theorem modinverse_i64_correct :
+    SignedMachineCorrect .I64 I64.Insts.ModinverseModInverse.modinverse :=
+  composeSigned modinverse_i64_spec
+
+/-- **The extracted `<i128 as ModInverse>::modinverse` is a correct modular inverse over `ℤ`.** -/
+theorem modinverse_i128_correct :
+    SignedMachineCorrect .I128 I128.Insts.ModinverseModInverse.modinverse :=
+  composeSigned modinverse_i128_spec
 
 end Refinement

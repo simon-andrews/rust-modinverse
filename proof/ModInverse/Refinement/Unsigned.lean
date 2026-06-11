@@ -309,36 +309,105 @@ theorem modinverse_u128.spec (a m : Std.U128) :
     have hr : r.val ≠ 1 := by scalar_tac
     simp [hr]
 
-/-! ## End-to-end correctness of the extracted `u128` machine code
+/-! ## End-to-end correctness of the extracted unsigned machine code
 
-  Composing the refinement (`modinverse_u128.spec`: machine refines the ℕ model) with
-  `ModInverse.isCorrect` (the model meets the specification) certifies the *actual
-  extracted machine code*: `modinverse_u128` never errors, and whatever it returns is
-  a correct modular inverse — sound, bounded, and complete. -/
+  Composing the per-width refinement (`modinverse_uN.spec`: machine refines the ℕ
+  model) with `ModInverse.isCorrect` (the model meets the specification) certifies
+  the *actual extracted machine code*, stated over the public trait methods
+  (`<uN as ModInverse>::modinverse` in the Rust) with no reference to the model:
+  the four clauses of `UnsignedMachineCorrect` transport the four fields of
+  `ModInverse.Spec.Correct` to the machine level. One generic composition lemma
+  serves every unsigned width (and `usize`, in `Platform.lean`). -/
 
-/-- **The extracted `modinverse_u128` is a correct modular inverse.** -/
-theorem modinverse_u128_correct (a m : Std.U128) (hm : 0 < m.val) :
-    modinverse_u128 a m ⦃ (r : Option Std.U128) =>
-      -- soundness: a returned witness really is an inverse
-      (∀ s : Std.U128, r = some s → a.val * s.val ≡ 1 [MOD m.val]) ∧
-      -- bound: the witness is the canonical representative in `[0, m)`
-      (∀ s : Std.U128, r = some s → s.val < m.val) ∧
-      -- completeness: an inverse is produced whenever one exists
-      (Nat.Coprime a.val m.val → ∃ s : Std.U128, r = some s) ⦄ := by
-  apply WP.spec_mono (modinverse_u128.spec a m)
+/-- The machine-level reading of `ModInverse.Spec.Correct` for an extracted
+    unsigned `modinverse` at width `w`: it never errors, a returned witness is a
+    real inverse and the canonical representative in `[0, m)`, a witness is
+    produced whenever one exists, and `none` is returned in exactly the
+    no-inverse cases. -/
+def UnsignedMachineCorrect (w : UScalarTy)
+    (f : UScalar w → UScalar w → Result (Option (UScalar w))) : Prop :=
+  ∀ a m : UScalar w,
+    f a m ⦃ (r : Option (UScalar w)) =>
+      -- sound: a returned witness really is an inverse
+      (∀ s, r = some s → a.val * s.val ≡ 1 [MOD m.val]) ∧
+      -- bounded: the witness is the canonical representative in `[0, m)`
+      (∀ s, r = some s → 0 < m.val → s.val < m.val) ∧
+      -- complete: an inverse is produced whenever one exists
+      (0 < m.val → Nat.Coprime a.val m.val → ∃ s, r = some s) ∧
+      -- fails exactly: `none` in exactly the no-inverse cases
+      (r = none ↔ m.val = 0 ∨ ¬ Nat.Coprime a.val m.val) ⦄
+
+/-- Generic composition: any width whose machine code value-matches the ℕ model
+    is machine-correct, by `ModInverse.isCorrect`. -/
+theorem composeUnsigned {w : UScalarTy}
+    {f : UScalar w → UScalar w → Result (Option (UScalar w))}
+    (hf : ∀ a m : UScalar w,
+      f a m ⦃ (r : Option (UScalar w)) =>
+        r.map (·.val) = ModInverse.modinverse a.val m.val ⦄) :
+    UnsignedMachineCorrect w f := by
+  intro a m
+  apply WP.spec_mono (hf a m)
   intro r hr
-  refine ⟨?_, ?_, ?_⟩
-  · intro s hs
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · -- sound
+    intro s hs
     apply ModInverse.isCorrect.sound
     rw [← hr, hs]; rfl
-  · intro s hs
+  · -- bounded
+    intro s hs hm
     apply ModInverse.isCorrect.bounded _ _ _ hm
     rw [← hr, hs]; rfl
-  · intro hcop
+  · -- complete
+    intro hm hcop
     obtain ⟨sm, hsm⟩ := ModInverse.isCorrect.complete a.val m.val hm hcop
     rw [hsm] at hr
     cases r with
     | none => simp at hr
     | some s => exact ⟨s, rfl⟩
+  · -- fails exactly
+    constructor
+    · intro hnone
+      apply (ModInverse.isCorrect.failsExactly a.val m.val).mp
+      rw [hnone] at hr
+      simpa using hr.symm
+    · intro hcase
+      have hmodel := (ModInverse.isCorrect.failsExactly a.val m.val).mpr hcase
+      rw [hmodel] at hr
+      simpa using hr
+
+/-- **The extracted `<u8 as ModInverse>::modinverse` is a correct modular inverse.** -/
+theorem modinverse_u8_correct :
+    UnsignedMachineCorrect .U8 U8.Insts.ModinverseModInverse.modinverse :=
+  composeUnsigned fun a m => by
+    unfold U8.Insts.ModinverseModInverse.modinverse
+    exact modinverse_u8.spec a m
+
+/-- **The extracted `<u16 as ModInverse>::modinverse` is a correct modular inverse.** -/
+theorem modinverse_u16_correct :
+    UnsignedMachineCorrect .U16 U16.Insts.ModinverseModInverse.modinverse :=
+  composeUnsigned fun a m => by
+    unfold U16.Insts.ModinverseModInverse.modinverse
+    exact modinverse_u16.spec a m
+
+/-- **The extracted `<u32 as ModInverse>::modinverse` is a correct modular inverse.** -/
+theorem modinverse_u32_correct :
+    UnsignedMachineCorrect .U32 U32.Insts.ModinverseModInverse.modinverse :=
+  composeUnsigned fun a m => by
+    unfold U32.Insts.ModinverseModInverse.modinverse
+    exact modinverse_u32.spec a m
+
+/-- **The extracted `<u64 as ModInverse>::modinverse` is a correct modular inverse.** -/
+theorem modinverse_u64_correct :
+    UnsignedMachineCorrect .U64 U64.Insts.ModinverseModInverse.modinverse :=
+  composeUnsigned fun a m => by
+    unfold U64.Insts.ModinverseModInverse.modinverse
+    exact modinverse_u64.spec a m
+
+/-- **The extracted `<u128 as ModInverse>::modinverse` is a correct modular inverse.** -/
+theorem modinverse_u128_correct :
+    UnsignedMachineCorrect .U128 U128.Insts.ModinverseModInverse.modinverse :=
+  composeUnsigned fun a m => by
+    unfold U128.Insts.ModinverseModInverse.modinverse
+    exact modinverse_u128.spec a m
 
 end Refinement

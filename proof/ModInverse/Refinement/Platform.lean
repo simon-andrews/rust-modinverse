@@ -112,4 +112,19 @@ theorem modinverse_isize_spec (a m : Std.Isize) :
       simp [ModInverseIsize.modinverse.closure.Insts.CoreOpsFunctionFnOnceTupleI64Isize.call_once,
             WP.spec_ok, cast_back_isize_val h0 h1, hsk]
 
+/-! ## End-to-end correctness of the extracted platform-width machine code
+
+  Same composition as the fixed widths: `usize` instantiates the unsigned
+  composition lemma, `isize` the signed one. -/
+
+/-- **The extracted `<usize as ModInverse>::modinverse` is a correct modular inverse.** -/
+theorem modinverse_usize_correct :
+    UnsignedMachineCorrect .Usize Usize.Insts.ModinverseModInverse.modinverse :=
+  composeUnsigned modinverse_usize_spec
+
+/-- **The extracted `<isize as ModInverse>::modinverse` is a correct modular inverse over `ℤ`.** -/
+theorem modinverse_isize_correct :
+    SignedMachineCorrect .Isize Isize.Insts.ModinverseModInverse.modinverse :=
+  composeSigned modinverse_isize_spec
+
 end Refinement
