@@ -27,9 +27,10 @@ re-run `just extract` and `just prove-correctness` — a change here can break t
 
 - **Verified:** the fixed-width path. The Lean development proves the `u128` model correct and
   proves every width's extracted code refines it.
+- **Verified, additionally:** `egcd_u64` (gcd + exact Bézout certificate, canonical `x`).
 - **Not verified:** the `bigint` feature paths (`modinverse_via_egcd_signed`,
-  `modinverse_via_egcd_with`) and the free `egcd` function. These use the generic helpers and are
-  covered only by tests.
+  `modinverse_via_egcd_with`) and the free generic `egcd`. These use the generic helpers and
+  are covered only by tests.
 
 ## Footguns
 

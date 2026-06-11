@@ -57,6 +57,12 @@ For fixed-width signed types, `egcd` is not safe at or near `T::MIN`: intermedia
 `T::MIN / -1` overflow. The crate's own `ModInverse` impls dodge this by widening one step
 first. If you call `egcd` directly, stay away from `T::MIN`.
 
+`egcd_u64` is the **mechanically verified** alternative: the same contract
+(`a*x + b*y = g = gcd(a, b)`, exactly), proven end to end against the extracted machine code
+to never error for *any* inputs — no overflow, no `T::MIN` caveat. Bézout coefficients are
+not unique, so it pins a different (equally valid) convention than the textbook `egcd`: `x`
+is the canonical coefficient in `[0, b)`.
+
 Features
 --------
 

@@ -15,9 +15,13 @@ audited by `../Refinement.lean`; see [`../CLAUDE.md`](../CLAUDE.md) for where th
   the two's-complement bit level in the `neg_abs_uN` lemmas — no postulates anywhere.
 - `Platform.lean` — `usize` / `isize`, dispatching to the 64-bit width, ending in their
   certificates.
+- `Egcd.lean` — `egcd_u64`: the loop spec is a verbatim copy of `modinverse_u64_loop.spec`
+  (same loop), and the tail verifies the exact Bézout cofactor computation (`u128` widening,
+  no-underflow from `g ∣ a`, exact division from the loop's congruence).
 
-The 14 `modinverse_*_correct` certificates are the binding interface: the trusted `Gate.lean`
-re-types them at frozen statements, so their names and types must keep existing verbatim.
+The 15 certificates (`modinverse_*_correct`, `egcd_u64_correct`) are the binding interface:
+the trusted `Gate.lean` re-types them at frozen statements, so their names and types must
+keep existing verbatim.
 
 ## Conventions (Aeneas, not generic Mathlib)
 

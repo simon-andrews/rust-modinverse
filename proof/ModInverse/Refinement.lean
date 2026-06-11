@@ -14,6 +14,7 @@
     * `Refinement/Signed.lean`   — `i8 … i128` (+ `composeSigned` and the signed
       certificates)
     * `Refinement/Platform.lean` — `usize` / `isize` certificates
+    * `Refinement/Egcd.lean`     — the `egcd_u64` certificate (gcd + exact Bézout)
 
   The certificates are re-typed at frozen statements — and their closures audited
   for unapproved axioms, build-failingly — by the trusted `Gate.lean` at the
@@ -27,3 +28,4 @@ import ModInverse.Refinement.Helpers
 import ModInverse.Refinement.Unsigned
 import ModInverse.Refinement.Signed
 import ModInverse.Refinement.Platform
+import ModInverse.Refinement.Egcd

@@ -11,8 +11,10 @@
       `usize`, `isize`), the extracted trait method is a correct modular inverse:
       it never errors, a returned witness really is an inverse and is the canonical
       representative, a witness is returned whenever one exists, and `None` comes
-      back in exactly the no-inverse cases. The statements (`UnsignedCorrect` /
-      `SignedCorrect` below) belong to this file; the workspace must produce terms
+      back in exactly the no-inverse cases. And the extracted `egcd_u64` is a
+      correct extended gcd: gcd plus an exact Bézout certificate with the canonical
+      first coefficient. The statements (`UnsignedCorrect` / `SignedCorrect` /
+      `EgcdU64Correct` below) belong to this file; the workspace must produce terms
       of exactly these types — they cannot be weakened from the outside.
 
     * Each certificate's axiom closure is inside an explicit allowlist — exactly
@@ -22,11 +24,11 @@
       rogue `axiom` can hide anywhere in a certificate's proof**: unlike the
       informational `#print axioms`, `#assert_axioms` fails the build.
 
-  The only AI-workspace names this file mentions are the 14 final certificates
-  (`Refinement.modinverse_*_correct`). Everything else — file layout, the model,
-  lemma structure, proof style — remains entirely the AI's to rearrange. Renaming a
-  certificate is an interface change and requires a human edit here; that is the
-  point.
+  The only AI-workspace names this file mentions are the 15 final certificates
+  (`Refinement.modinverse_*_correct`, `Refinement.egcd_u64_correct`). Everything
+  else — file layout, the model, lemma structure, proof style — remains entirely
+  the AI's to rearrange. Renaming a certificate is an interface change and
+  requires a human edit here; that is the point.
 
   Like the spec, this file is frozen: `just trusted-unchanged` checks its hash.
 -/
@@ -86,7 +88,7 @@ def SignedCorrect (w : IScalarTy)
       (m.val ≠ 0 → Int.gcd a.val m.val = 1 → ∃ s, r = some s) ∧
       (r = none ↔ m.val = 0 ∨ Int.gcd a.val m.val ≠ 1) ⦄
 
-/-! ## The 14 certificates, anchored
+/-! ## The 15 certificates, anchored
 
   Each `theorem` below re-types an AI-workspace certificate at this file's trusted
   statement (the two must be definitionally identical or the build fails), then
@@ -145,5 +147,21 @@ theorem usize_correct : UnsignedCorrect .Usize Usize.Insts.ModinverseModInverse.
 theorem isize_correct : SignedCorrect .Isize Isize.Insts.ModinverseModInverse.modinverse :=
   Refinement.modinverse_isize_correct
 #assert_axioms isize_correct [propext, Classical.choice, Quot.sound]
+
+/-! ### Extended gcd -/
+
+/-- The extracted `egcd_u64` is a correct extended gcd: it never errors, its first
+    component is `gcd a b`, the two `i128` coefficients certify it exactly over
+    `ℤ`, and the first coefficient is the canonical one in `[0, b)`. -/
+def EgcdU64Correct (f : U64 → U64 → Result (U64 × I128 × I128)) : Prop :=
+  ∀ a b : U64,
+    f a b ⦃ (res : U64 × I128 × I128) =>
+      res.1.val = Nat.gcd a.val b.val ∧
+      (a.val : ℤ) * res.2.1.val + (b.val : ℤ) * res.2.2.val = (res.1.val : ℤ) ∧
+      (0 < b.val → 0 ≤ res.2.1.val ∧ res.2.1.val < (b.val : ℤ)) ⦄
+
+theorem egcd_u64_correct : EgcdU64Correct egcd_u64 :=
+  Refinement.egcd_u64_correct
+#assert_axioms egcd_u64_correct [propext, Classical.choice, Quot.sound]
 
 end Gate

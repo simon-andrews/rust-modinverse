@@ -57,6 +57,21 @@ structure Correct (model : ℕ → ℕ → Option ℕ) : Prop where
   /-- Exact failure: `none` is returned in exactly the no-inverse cases. -/
   failsExactly : ∀ a m, model a m = none ↔ m = 0 ∨ ¬ Nat.Coprime a m
 
+/-- What it means for `model` to be a correct extended-gcd function.
+
+    `model a b` returns `(g, x, y)`: the gcd of `a` and `b` together with an exact
+    Bézout certificate for it. Bézout coefficients are not unique, so the spec also
+    pins the convention: `x` is the canonical representative in `[0, b)` (which
+    then determines `y`). -/
+structure EgcdCorrect (model : ℕ → ℕ → ℕ × ℤ × ℤ) : Prop where
+  /-- The first component really is the gcd. -/
+  gcd_eq : ∀ a b, (model a b).1 = Nat.gcd a b
+  /-- The coefficients certify it, exactly, over `ℤ`: `a*x + b*y = g`. -/
+  bezout : ∀ a b : ℕ,
+    (a : ℤ) * (model a b).2.1 + (b : ℤ) * (model a b).2.2 = ((model a b).1 : ℤ)
+  /-- `x` is the canonical coefficient in `[0, b)`. -/
+  xCanonical : ∀ a b : ℕ, 0 < b → 0 ≤ (model a b).2.1 ∧ (model a b).2.1 < (b : ℤ)
+
 /-- What it means for the overflow-avoiding helpers to compute standard modular
     arithmetic. `addMod`/`mulMod` exist only to dodge `u128` overflow; these
     targets say they nonetheless equal `(a+b) % m` and `(a*b) % m`. -/

@@ -7,10 +7,10 @@ is the index.
 
 **You own this directory's structure.** The layout below is the current state, not a mandate —
 split, merge, rename, or rethink the proof however works best. The only fixed contracts are the
-spec in `../ModInverse.lean`, the gate in `../Gate.lean` (it re-types the 14 certificates
-`Refinement.modinverse_*_correct` at frozen statements and audits their axiom closures,
-build-failingly — so those 14 names and types must keep existing), and the discipline at the
-bottom (no `sorry`; no axioms outside `Extern.lean`).
+spec in `../ModInverse.lean`, the gate in `../Gate.lean` (it re-types the 15 certificates —
+`Refinement.modinverse_*_correct` and `Refinement.egcd_u64_correct` — at frozen statements and
+audits their axiom closures, build-failingly, so those 15 names and types must keep existing),
+and the discipline at the bottom (no `sorry`; no axioms outside `Extern.lean`).
 
 The **model itself lives here**, not in the trusted root: `Model.lean` is the `ℕ` transcription of
 `src/lib.rs`. It is a *target*, not trusted — refinement proves the real code matches it — so it
@@ -24,7 +24,8 @@ may be freely rewritten as long as both obligations below still discharge agains
   only). The shared target for every width; the `code ⊑ model` half of correctness points at it.
 - `Proofs.lean` — the model satisfies `Spec.Correct`. Strategy: a loop invariant stated in
   `ZMod m` (so per-step `% m` reductions vanish), translated back to `Nat` congruences at the end.
-  Ends in the certificates `isCorrect : Spec.Correct modinverse` and `helpersCompute`.
+  Ends in the certificates `isCorrect : Spec.Correct modinverse`, `helpersCompute`, and
+  `isEgcdCorrect : Spec.EgcdCorrect egcd`.
 - `Signed.lean` — the `[0, |m|)` canonicalization (`reduceSigned`) the signed wrappers perform,
   plus the ℕ/ℤ bridge lemmas. Plain Mathlib reasoning, not Aeneas.
 

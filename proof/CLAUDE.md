@@ -5,11 +5,12 @@ the pieces compose lives in the header comment of `ModInverse.lean` — read it 
 
 ## The human / AI boundary
 
-- **`Gate.lean` is human-maintained and trusted — the enforcement.** It re-types the 14
-  end-to-end certificates (`Refinement.modinverse_*_correct`) at frozen statements written in
+- **`Gate.lean` is human-maintained and trusted — the enforcement.** It re-types the 15
+  end-to-end certificates (`Refinement.modinverse_*_correct`, `Refinement.egcd_u64_correct`)
+  at frozen statements written in
   trusted vocabulary only (extracted machine code + arithmetic, never the model), and its
   `#assert_axioms` command fails the build if a certificate's axiom closure strays outside an
-  explicit allowlist. The only AI-workspace names it pins are those 14 certificates.
+  explicit allowlist. The only AI-workspace names it pins are those 15 certificates.
 - **`ModInverse.lean` is human-maintained and trusted — and holds *only the specification*.**
   `ModInverse.Spec.Correct` (what "a correct modular inverse" means) and `HelpersCompute`. No
   algorithm, no proofs. To judge whether the crate is proven correct, read *only* this file: are

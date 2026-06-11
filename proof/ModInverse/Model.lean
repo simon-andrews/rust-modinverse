@@ -115,4 +115,22 @@ def mulModAux (m : ℕ) : ℕ → ℕ → ℕ → ℕ
 def mulMod (a b m : ℕ) : ℕ :=
   if m = 0 then 0 else mulModAux m (a % m) b 0
 
+/-! ## Extended gcd. Mirror of Rust `pub fn egcd_u64`. -/
+
+/-- Lean mirror of Rust `pub fn egcd_u64(a, b) -> (u64, i128, i128)`: the gcd plus
+    an exact Bézout certificate `(x, y)`, with `x` the canonical coefficient in
+    `[0, b)` (it is the same `s` the inverse loop tracks) and
+    `y = (g - a*x) / b` the determined integer cofactor. Note the `s = 0` case
+    needs no special handling here: `b` divides `g` exactly then, so the division
+    yields the right `y` (`= 1`) on its own. -/
+def egcd (a b : ℕ) : ℕ × ℤ × ℤ :=
+  if hb : 1 < b then
+    let init : State b :=
+      { r := b, rNext := a % b, s := 0, sNext := 1,
+        sLt := by omega, sNextLt := hb }
+    let p := loop (by omega) init
+    (p.1, (p.2 : ℤ), ((p.1 : ℤ) - (a : ℤ) * (p.2 : ℤ)) / (b : ℤ))
+  else if b = 1 then (1, 0, 1)
+  else (a, 1, 0)
+
 end ModInverse

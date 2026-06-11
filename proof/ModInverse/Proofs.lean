@@ -157,8 +157,8 @@ theorem modinverseCore_lt (a m : ℕ) (hm : 1 < m) (s : ℕ)
   obtain rfl : p.2 = s := Option.some_inj.mp h
   exact hBound
 
-/-- The loop's first output is `gcd a m`. -/
-private lemma loop_fst_eq_gcd_init {a m : ℕ} (hm : 1 < m) :
+/-- The loop's first output is `gcd a m`. Public: the `egcd` proofs reuse it. -/
+lemma loop_fst_eq_gcd_init {a m : ℕ} (hm : 1 < m) :
     (loop (by omega : 0 < m)
        (⟨m, a % m, 0, 1, by omega, hm⟩ : State m)).1 = Nat.gcd a m := by
   rw [loop_fst_eq_gcd]
@@ -344,6 +344,76 @@ theorem isCorrect : Spec.Correct modinverse where
 theorem helpersCompute : Spec.HelpersCompute addMod mulMod where
   addMod_eq := fun _ _ _ ha hb hm => addMod_eq ha hb hm
   mulMod_eq := fun _ _ _ hm       => mulMod_eq hm
+
+/-\! ## Correctness of `egcd`
+
+    The extended gcd reuses the inverse's loop wholesale: `g` is the loop's first
+    output (`loop_fst_eq_gcd_init`), `x = s` is its second (`invariant_loop` gives
+    the congruence `a*s ≡ g (mod b)`, `loop_snd_lt` the canonical bound), and `y`
+    is exact integer division because that congruence is exactly the needed
+    divisibility. -/
+
+/-- Unfold `egcd` in the interesting case and expose the loop's output. Public:
+    the machine-code refinement uses it to connect the extracted loop's outputs to
+    the model's components. -/
+theorem egcd_loop_eq (a b : ℕ) (hb : 1 < b) :
+    let init : State b := ⟨b, a % b, 0, 1, by omega, hb⟩
+    let p := loop (by omega) init
+    egcd a b = (p.1, (p.2 : ℤ), ((p.1 : ℤ) - (a : ℤ) * (p.2 : ℤ)) / (b : ℤ)) := by
+  simp only [egcd, dif_pos hb]
+
+/-- The loop's Bézout congruence, as exact divisibility over `ℤ`. Public: the
+    machine-code refinement needs it to justify the extracted `y` computation. -/
+theorem egcd_loop_dvd (a b : ℕ) (hb : 1 < b) :
+    let init : State b := ⟨b, a % b, 0, 1, by omega, hb⟩
+    let p := loop (by omega) init
+    (b : ℤ) ∣ ((p.1 : ℤ) - (a : ℤ) * (p.2 : ℤ)) := by
+  intro init p
+  have hInv : (a : ZMod b) * (p.2 : ℕ) = ((p.1 : ℕ) : ZMod b) :=
+    invariant_loop (by omega) init (invariant_init hb)
+  have hCast : ((a * p.2 : ℕ) : ZMod b) = ((p.1 : ℕ) : ZMod b) := by
+    push_cast; exact hInv
+  rw [ZMod.natCast_eq_natCast_iff] at hCast
+  have h := hCast.dvd
+  exact_mod_cast h
+
+/-- `egcd` satisfies every correctness target. -/
+theorem isEgcdCorrect : Spec.EgcdCorrect egcd where
+  gcd_eq := by
+    intro a b
+    by_cases hb : 1 < b
+    · rw [egcd_loop_eq a b hb]
+      exact loop_fst_eq_gcd_init hb
+    · by_cases h1 : b = 1
+      · subst h1
+        simp [egcd]
+      · have h0 : b = 0 := by omega
+        subst h0
+        simp [egcd]
+  bezout := by
+    intro a b
+    by_cases hb : 1 < b
+    · have hdvd := egcd_loop_dvd a b hb
+      rw [egcd_loop_eq a b hb]
+      simp only at hdvd ⊢
+      rw [Int.mul_ediv_cancel' hdvd]
+      ring
+    · by_cases h1 : b = 1
+      · subst h1
+        simp [egcd]
+      · have h0 : b = 0 := by omega
+        subst h0
+        simp [egcd]
+  xCanonical := by
+    intro a b hbpos
+    by_cases hb : 1 < b
+    · rw [egcd_loop_eq a b hb]
+      dsimp only
+      refine ⟨by positivity, ?_⟩
+      exact_mod_cast loop_snd_lt (by omega) _
+    · have h1 : b = 1 := by omega
+      subst h1
+      simp [egcd]
 
 /-! ## Mechanized sanity check (definition-level, not part of the spec)
 

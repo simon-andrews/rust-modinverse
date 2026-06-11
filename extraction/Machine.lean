@@ -165,14 +165,77 @@ def egcd
   := do
   sorry
 
+/-- [modinverse::mul_mod_u64]:
+    Source: 'src/lib.rs', lines 265:0-267:1 -/
+def mul_mod_u64
+  (a : Std.U64) (b : Std.U64) (m : Std.U64) : Result Std.U64 := do
+  let i ← lift (UScalar.cast .U128 a)
+  let i1 ← lift (UScalar.cast .U128 b)
+  let i2 ← i * i1
+  let i3 ← lift (UScalar.cast .U128 m)
+  let i4 ← i2 % i3
+  ok (UScalar.cast .U64 i4)
+
+/-- [modinverse::egcd_u64]: loop 0:
+    Source: 'src/lib.rs', lines 105:4-112:5
+    Visibility: public -/
+@[rust_loop]
+def egcd_u64_loop
+  (b : Std.U64) (r : Std.U64) (r_next : Std.U64) (s : Std.U64)
+  (s_next : Std.U64) :
+  Result (Std.U64 × Std.U64)
+  := do
+  if r_next != 0#u64
+  then
+    let q ← r / r_next
+    let rem ← r % r_next
+    let qs ← mul_mod_u64 q s_next b
+    if s >= qs
+    then let s_new ← s - qs
+         egcd_u64_loop b r_next rem s_next s_new
+    else
+      let i ← b - qs
+      let s_new ← i + s
+      egcd_u64_loop b r_next rem s_next s_new
+  else ok (r, s)
+partial_fixpoint
+
+/-- [modinverse::egcd_u64]:
+    Source: 'src/lib.rs', lines 93:0-124:1
+    Visibility: public -/
+def egcd_u64
+  (a : Std.U64) (b : Std.U64) : Result (Std.U64 × Std.I128 × Std.I128) := do
+  if b = 0#u64
+  then ok (a, 1#i128, 0#i128)
+  else
+    if b = 1#u64
+    then ok (1#u64, 0#i128, 1#i128)
+    else
+      let r_next ← a % b
+      let (r, s) ← egcd_u64_loop b b r_next 0#u64 1#u64
+      if s = 0#u64
+      then ok (r, 0#i128, 1#i128)
+      else
+        let i ← lift (UScalar.cast .U128 a)
+        let i1 ← lift (UScalar.cast .U128 s)
+        let i2 ← i * i1
+        let i3 ← lift (UScalar.cast .U128 r)
+        let num ← i2 - i3
+        let i4 ← lift (UScalar.hcast .I128 s)
+        let i5 ← lift (UScalar.cast .U128 b)
+        let i6 ← num / i5
+        let i7 ← lift (UScalar.hcast .I128 i6)
+        let i8 ← -. i7
+        ok (r, i4, i8)
+
 /-- Trait declaration: [modinverse::ModInverse]
-    Source: 'src/lib.rs', lines 177:0-179:1
+    Source: 'src/lib.rs', lines 229:0-231:1
     Visibility: public -/
 structure ModInverse (Self : Type) where
   modinverse : Self → Self → Result (Option Self)
 
 /-- [modinverse::modinverse]:
-    Source: 'src/lib.rs', lines 189:0-191:1
+    Source: 'src/lib.rs', lines 241:0-243:1
     Visibility: public -/
 def modinverse
   {T : Type} (ModInverseInst : ModInverse T) (a : T) (m : T) :
@@ -181,7 +244,7 @@ def modinverse
   ModInverseInst.modinverse a m
 
 /-- [modinverse::mul_mod_u8]:
-    Source: 'src/lib.rs', lines 204:0-206:1 -/
+    Source: 'src/lib.rs', lines 256:0-258:1 -/
 def mul_mod_u8 (a : Std.U8) (b : Std.U8) (m : Std.U8) : Result Std.U8 := do
   let i ← lift (UScalar.cast .U16 a)
   let i1 ← lift (UScalar.cast .U16 b)
@@ -191,7 +254,7 @@ def mul_mod_u8 (a : Std.U8) (b : Std.U8) (m : Std.U8) : Result Std.U8 := do
   ok (UScalar.cast .U8 i4)
 
 /-- [modinverse::mul_mod_u16]:
-    Source: 'src/lib.rs', lines 207:0-209:1 -/
+    Source: 'src/lib.rs', lines 259:0-261:1 -/
 def mul_mod_u16
   (a : Std.U16) (b : Std.U16) (m : Std.U16) : Result Std.U16 := do
   let i ← lift (UScalar.cast .U32 a)
@@ -202,7 +265,7 @@ def mul_mod_u16
   ok (UScalar.cast .U16 i4)
 
 /-- [modinverse::mul_mod_u32]:
-    Source: 'src/lib.rs', lines 210:0-212:1 -/
+    Source: 'src/lib.rs', lines 262:0-264:1 -/
 def mul_mod_u32
   (a : Std.U32) (b : Std.U32) (m : Std.U32) : Result Std.U32 := do
   let i ← lift (UScalar.cast .U64 a)
@@ -212,19 +275,8 @@ def mul_mod_u32
   let i4 ← i2 % i3
   ok (UScalar.cast .U32 i4)
 
-/-- [modinverse::mul_mod_u64]:
-    Source: 'src/lib.rs', lines 213:0-215:1 -/
-def mul_mod_u64
-  (a : Std.U64) (b : Std.U64) (m : Std.U64) : Result Std.U64 := do
-  let i ← lift (UScalar.cast .U128 a)
-  let i1 ← lift (UScalar.cast .U128 b)
-  let i2 ← i * i1
-  let i3 ← lift (UScalar.cast .U128 m)
-  let i4 ← i2 % i3
-  ok (UScalar.cast .U64 i4)
-
 /-- [modinverse::modinverse_u8]: loop 0:
-    Source: 'src/lib.rs', lines 231:12-238:13 -/
+    Source: 'src/lib.rs', lines 283:12-290:13 -/
 @[rust_loop]
 def modinverse_u8_loop
   (m : Std.U8) (r : Std.U8) (r_next : Std.U8) (s : Std.U8) (s_next : Std.U8) :
@@ -246,7 +298,7 @@ def modinverse_u8_loop
 partial_fixpoint
 
 /-- [modinverse::modinverse_u8]:
-    Source: 'src/lib.rs', lines 222:8-244:9 -/
+    Source: 'src/lib.rs', lines 274:8-296:9 -/
 def modinverse_u8 (a : Std.U8) (m : Std.U8) : Result (Option Std.U8) := do
   if m = 0#u8
   then ok none
@@ -261,7 +313,7 @@ def modinverse_u8 (a : Std.U8) (m : Std.U8) : Result (Option Std.U8) := do
       else ok none
 
 /-- [modinverse::modinverse_u16]: loop 0:
-    Source: 'src/lib.rs', lines 231:12-238:13 -/
+    Source: 'src/lib.rs', lines 283:12-290:13 -/
 @[rust_loop]
 def modinverse_u16_loop
   (m : Std.U16) (r : Std.U16) (r_next : Std.U16) (s : Std.U16)
@@ -284,7 +336,7 @@ def modinverse_u16_loop
 partial_fixpoint
 
 /-- [modinverse::modinverse_u16]:
-    Source: 'src/lib.rs', lines 222:8-244:9 -/
+    Source: 'src/lib.rs', lines 274:8-296:9 -/
 def modinverse_u16 (a : Std.U16) (m : Std.U16) : Result (Option Std.U16) := do
   if m = 0#u16
   then ok none
@@ -299,7 +351,7 @@ def modinverse_u16 (a : Std.U16) (m : Std.U16) : Result (Option Std.U16) := do
       else ok none
 
 /-- [modinverse::modinverse_u32]: loop 0:
-    Source: 'src/lib.rs', lines 231:12-238:13 -/
+    Source: 'src/lib.rs', lines 283:12-290:13 -/
 @[rust_loop]
 def modinverse_u32_loop
   (m : Std.U32) (r : Std.U32) (r_next : Std.U32) (s : Std.U32)
@@ -322,7 +374,7 @@ def modinverse_u32_loop
 partial_fixpoint
 
 /-- [modinverse::modinverse_u32]:
-    Source: 'src/lib.rs', lines 222:8-244:9 -/
+    Source: 'src/lib.rs', lines 274:8-296:9 -/
 def modinverse_u32 (a : Std.U32) (m : Std.U32) : Result (Option Std.U32) := do
   if m = 0#u32
   then ok none
@@ -337,7 +389,7 @@ def modinverse_u32 (a : Std.U32) (m : Std.U32) : Result (Option Std.U32) := do
       else ok none
 
 /-- [modinverse::modinverse_u64]: loop 0:
-    Source: 'src/lib.rs', lines 231:12-238:13 -/
+    Source: 'src/lib.rs', lines 283:12-290:13 -/
 @[rust_loop]
 def modinverse_u64_loop
   (m : Std.U64) (r : Std.U64) (r_next : Std.U64) (s : Std.U64)
@@ -360,7 +412,7 @@ def modinverse_u64_loop
 partial_fixpoint
 
 /-- [modinverse::modinverse_u64]:
-    Source: 'src/lib.rs', lines 222:8-244:9 -/
+    Source: 'src/lib.rs', lines 274:8-296:9 -/
 def modinverse_u64 (a : Std.U64) (m : Std.U64) : Result (Option Std.U64) := do
   if m = 0#u64
   then ok none
@@ -375,7 +427,7 @@ def modinverse_u64 (a : Std.U64) (m : Std.U64) : Result (Option Std.U64) := do
       else ok none
 
 /-- [modinverse::add_mod_u128]:
-    Source: 'src/lib.rs', lines 330:0-337:1 -/
+    Source: 'src/lib.rs', lines 382:0-389:1 -/
 def add_mod_u128
   (a : Std.U128) (b : Std.U128) (m : Std.U128) : Result Std.U128 := do
   let room ← m - a
@@ -384,7 +436,7 @@ def add_mod_u128
   else b - room
 
 /-- [modinverse::mul_mod_u128]: loop 0:
-    Source: 'src/lib.rs', lines 319:4-325:5 -/
+    Source: 'src/lib.rs', lines 371:4-377:5 -/
 @[rust_loop]
 def mul_mod_u128_loop
   (a : Std.U128) (b : Std.U128) (m : Std.U128) (result : Std.U128) :
@@ -403,14 +455,14 @@ def mul_mod_u128_loop
 partial_fixpoint
 
 /-- [modinverse::mul_mod_u128]:
-    Source: 'src/lib.rs', lines 316:0-327:1 -/
+    Source: 'src/lib.rs', lines 368:0-379:1 -/
 def mul_mod_u128
   (a : Std.U128) (b : Std.U128) (m : Std.U128) : Result Std.U128 := do
   let a1 ← a % m
   mul_mod_u128_loop a1 b m 0#u128
 
 /-- [modinverse::modinverse_u128]: loop 0:
-    Source: 'src/lib.rs', lines 231:12-238:13 -/
+    Source: 'src/lib.rs', lines 283:12-290:13 -/
 @[rust_loop]
 def modinverse_u128_loop
   (m : Std.U128) (r : Std.U128) (r_next : Std.U128) (s : Std.U128)
@@ -433,7 +485,7 @@ def modinverse_u128_loop
 partial_fixpoint
 
 /-- [modinverse::modinverse_u128]:
-    Source: 'src/lib.rs', lines 222:8-244:9 -/
+    Source: 'src/lib.rs', lines 274:8-296:9 -/
 def modinverse_u128
   (a : Std.U128) (m : Std.U128) : Result (Option Std.U128) := do
   if m = 0#u128
@@ -449,77 +501,77 @@ def modinverse_u128
       else ok none
 
 /-- [modinverse::{impl modinverse::ModInverse for u8}::modinverse]:
-    Source: 'src/lib.rs', lines 258:12-260:13
+    Source: 'src/lib.rs', lines 310:12-312:13
     Visibility: public -/
 def U8.Insts.ModinverseModInverse.modinverse
   (self : Std.U8) (m : Std.U8) : Result (Option Std.U8) := do
   modinverse_u8 self m
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for u8}]
-    Source: 'src/lib.rs', lines 257:8-261:9 -/
+    Source: 'src/lib.rs', lines 309:8-313:9 -/
 @[reducible]
 def U8.Insts.ModinverseModInverse : ModInverse Std.U8 := {
   modinverse := U8.Insts.ModinverseModInverse.modinverse
 }
 
 /-- [modinverse::{impl modinverse::ModInverse for u16}::modinverse]:
-    Source: 'src/lib.rs', lines 258:12-260:13
+    Source: 'src/lib.rs', lines 310:12-312:13
     Visibility: public -/
 def U16.Insts.ModinverseModInverse.modinverse
   (self : Std.U16) (m : Std.U16) : Result (Option Std.U16) := do
   modinverse_u16 self m
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for u16}]
-    Source: 'src/lib.rs', lines 257:8-261:9 -/
+    Source: 'src/lib.rs', lines 309:8-313:9 -/
 @[reducible]
 def U16.Insts.ModinverseModInverse : ModInverse Std.U16 := {
   modinverse := U16.Insts.ModinverseModInverse.modinverse
 }
 
 /-- [modinverse::{impl modinverse::ModInverse for u32}::modinverse]:
-    Source: 'src/lib.rs', lines 258:12-260:13
+    Source: 'src/lib.rs', lines 310:12-312:13
     Visibility: public -/
 def U32.Insts.ModinverseModInverse.modinverse
   (self : Std.U32) (m : Std.U32) : Result (Option Std.U32) := do
   modinverse_u32 self m
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for u32}]
-    Source: 'src/lib.rs', lines 257:8-261:9 -/
+    Source: 'src/lib.rs', lines 309:8-313:9 -/
 @[reducible]
 def U32.Insts.ModinverseModInverse : ModInverse Std.U32 := {
   modinverse := U32.Insts.ModinverseModInverse.modinverse
 }
 
 /-- [modinverse::{impl modinverse::ModInverse for u64}::modinverse]:
-    Source: 'src/lib.rs', lines 258:12-260:13
+    Source: 'src/lib.rs', lines 310:12-312:13
     Visibility: public -/
 def U64.Insts.ModinverseModInverse.modinverse
   (self : Std.U64) (m : Std.U64) : Result (Option Std.U64) := do
   modinverse_u64 self m
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for u64}]
-    Source: 'src/lib.rs', lines 257:8-261:9 -/
+    Source: 'src/lib.rs', lines 309:8-313:9 -/
 @[reducible]
 def U64.Insts.ModinverseModInverse : ModInverse Std.U64 := {
   modinverse := U64.Insts.ModinverseModInverse.modinverse
 }
 
 /-- [modinverse::{impl modinverse::ModInverse for u128}::modinverse]:
-    Source: 'src/lib.rs', lines 258:12-260:13
+    Source: 'src/lib.rs', lines 310:12-312:13
     Visibility: public -/
 def U128.Insts.ModinverseModInverse.modinverse
   (self : Std.U128) (m : Std.U128) : Result (Option Std.U128) := do
   modinverse_u128 self m
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for u128}]
-    Source: 'src/lib.rs', lines 257:8-261:9 -/
+    Source: 'src/lib.rs', lines 309:8-313:9 -/
 @[reducible]
 def U128.Insts.ModinverseModInverse : ModInverse Std.U128 := {
   modinverse := U128.Insts.ModinverseModInverse.modinverse
 }
 
 /-- [modinverse::{impl modinverse::ModInverse for i8}::modinverse]:
-    Source: 'src/lib.rs', lines 287:12-303:13
+    Source: 'src/lib.rs', lines 339:12-355:13
     Visibility: public -/
 def I8.Insts.ModinverseModInverse.modinverse
   (self : Std.I8) (m : Std.I8) : Result (Option Std.I8) := do
@@ -554,14 +606,14 @@ def I8.Insts.ModinverseModInverse.modinverse
                 ok (some i)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i8}]
-    Source: 'src/lib.rs', lines 284:8-304:9 -/
+    Source: 'src/lib.rs', lines 336:8-356:9 -/
 @[reducible]
 def I8.Insts.ModinverseModInverse : ModInverse Std.I8 := {
   modinverse := I8.Insts.ModinverseModInverse.modinverse
 }
 
 /-- [modinverse::{impl modinverse::ModInverse for i16}::modinverse]:
-    Source: 'src/lib.rs', lines 287:12-303:13
+    Source: 'src/lib.rs', lines 339:12-355:13
     Visibility: public -/
 def I16.Insts.ModinverseModInverse.modinverse
   (self : Std.I16) (m : Std.I16) : Result (Option Std.I16) := do
@@ -596,14 +648,14 @@ def I16.Insts.ModinverseModInverse.modinverse
                 ok (some i)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i16}]
-    Source: 'src/lib.rs', lines 284:8-304:9 -/
+    Source: 'src/lib.rs', lines 336:8-356:9 -/
 @[reducible]
 def I16.Insts.ModinverseModInverse : ModInverse Std.I16 := {
   modinverse := I16.Insts.ModinverseModInverse.modinverse
 }
 
 /-- [modinverse::{impl modinverse::ModInverse for i32}::modinverse]:
-    Source: 'src/lib.rs', lines 287:12-303:13
+    Source: 'src/lib.rs', lines 339:12-355:13
     Visibility: public -/
 def I32.Insts.ModinverseModInverse.modinverse
   (self : Std.I32) (m : Std.I32) : Result (Option Std.I32) := do
@@ -638,14 +690,14 @@ def I32.Insts.ModinverseModInverse.modinverse
                 ok (some i)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i32}]
-    Source: 'src/lib.rs', lines 284:8-304:9 -/
+    Source: 'src/lib.rs', lines 336:8-356:9 -/
 @[reducible]
 def I32.Insts.ModinverseModInverse : ModInverse Std.I32 := {
   modinverse := I32.Insts.ModinverseModInverse.modinverse
 }
 
 /-- [modinverse::{impl modinverse::ModInverse for i64}::modinverse]:
-    Source: 'src/lib.rs', lines 287:12-303:13
+    Source: 'src/lib.rs', lines 339:12-355:13
     Visibility: public -/
 def I64.Insts.ModinverseModInverse.modinverse
   (self : Std.I64) (m : Std.I64) : Result (Option Std.I64) := do
@@ -680,14 +732,14 @@ def I64.Insts.ModinverseModInverse.modinverse
                 ok (some i)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i64}]
-    Source: 'src/lib.rs', lines 284:8-304:9 -/
+    Source: 'src/lib.rs', lines 336:8-356:9 -/
 @[reducible]
 def I64.Insts.ModinverseModInverse : ModInverse Std.I64 := {
   modinverse := I64.Insts.ModinverseModInverse.modinverse
 }
 
 /-- [modinverse::{impl modinverse::ModInverse for i128}::modinverse]:
-    Source: 'src/lib.rs', lines 287:12-303:13
+    Source: 'src/lib.rs', lines 339:12-355:13
     Visibility: public -/
 def I128.Insts.ModinverseModInverse.modinverse
   (self : Std.I128) (m : Std.I128) : Result (Option Std.I128) := do
@@ -722,14 +774,14 @@ def I128.Insts.ModinverseModInverse.modinverse
                 ok (some i)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for i128}]
-    Source: 'src/lib.rs', lines 284:8-304:9 -/
+    Source: 'src/lib.rs', lines 336:8-356:9 -/
 @[reducible]
 def I128.Insts.ModinverseModInverse : ModInverse Std.I128 := {
   modinverse := I128.Insts.ModinverseModInverse.modinverse
 }
 
 /-- [modinverse::{impl modinverse::ModInverse for usize}::modinverse]:
-    Source: 'src/lib.rs', lines 379:4-384:5
+    Source: 'src/lib.rs', lines 431:4-436:5
     Visibility: public -/
 def Usize.Insts.ModinverseModInverse.modinverse
   (self : Std.Usize) (m : Std.Usize) : Result (Option Std.Usize) := do
@@ -742,14 +794,14 @@ def Usize.Insts.ModinverseModInverse.modinverse
               ok (some i2)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for usize}]
-    Source: 'src/lib.rs', lines 376:0-385:1 -/
+    Source: 'src/lib.rs', lines 428:0-437:1 -/
 @[reducible]
 def Usize.Insts.ModinverseModInverse : ModInverse Std.Usize := {
   modinverse := Usize.Insts.ModinverseModInverse.modinverse
 }
 
 /-- [modinverse::{impl modinverse::ModInverse for isize}::modinverse]:
-    Source: 'src/lib.rs', lines 413:4-418:5
+    Source: 'src/lib.rs', lines 465:4-470:5
     Visibility: public -/
 def Isize.Insts.ModinverseModInverse.modinverse
   (self : Std.Isize) (m : Std.Isize) : Result (Option Std.Isize) := do
@@ -762,7 +814,7 @@ def Isize.Insts.ModinverseModInverse.modinverse
               ok (some i2)
 
 /-- Trait implementation: [modinverse::{impl modinverse::ModInverse for isize}]
-    Source: 'src/lib.rs', lines 410:0-419:1 -/
+    Source: 'src/lib.rs', lines 462:0-471:1 -/
 @[reducible]
 def Isize.Insts.ModinverseModInverse : ModInverse Std.Isize := {
   modinverse := Isize.Insts.ModinverseModInverse.modinverse

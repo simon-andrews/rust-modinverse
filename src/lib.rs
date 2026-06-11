@@ -71,6 +71,58 @@ pub fn egcd<T: Clone + Integer + Signed>(a: T, b: T) -> (T, T, T) {
     (old_r, old_s, old_t)
 }
 
+/// Extended Euclid for `u64`, **mechanically verified** end to end: returns `(g, x, y)` with
+/// `g = gcd(a, b)` and `a*x + b*y = g` exactly.
+///
+/// Bézout coefficients are not unique; this function pins the convention rather than matching
+/// the textbook [`egcd`]: `x` is the *canonical* coefficient with `0 <= x < b` (when `b > 0`),
+/// and `y = (g - a*x) / b` is then determined (it is `<= 0` except in degenerate cases). The
+/// coefficients are returned as `i128` because `y` can fall anywhere in `(-2^64, 1]`.
+///
+/// Runs the same per-step-reduced loop as the verified `modinverse` cores — no negative
+/// intermediates, no overflow, no panics, for **all** inputs including `0`.
+///
+/// ```
+/// use modinverse::egcd_u64;
+///
+/// let (g, x, y) = egcd_u64(26, 3);
+/// assert_eq!(g, 1);
+/// assert_eq!((26 * x) + (3 * y), 1);
+/// assert!(0 <= x && x < 3);
+/// ```
+pub fn egcd_u64(a: u64, b: u64) -> (u64, i128, i128) {
+    if b == 0 {
+        return (a, 1, 0);
+    }
+    if b == 1 {
+        return (1, 0, 1);
+    }
+    // The per-step-reduced extended Euclidean loop, exactly as in `modinverse_core!` with
+    // `m := b` — `s` tracks the coefficient of `a` modulo `b` and never leaves `[0, b)`.
+    let m = b;
+    let (mut r, mut r_next) = (m, a % m);
+    let (mut s, mut s_next): (u64, u64) = (0, 1);
+    while r_next != 0 {
+        let q = r / r_next;
+        let rem = r % r_next;
+        let qs = mul_mod_u64(q, s_next, m);
+        (r, r_next) = (r_next, rem);
+        let s_new = if s >= qs { s - qs } else { (m - qs) + s };
+        (s, s_next) = (s_next, s_new);
+    }
+    // r = gcd(a, b) and a*s ≡ r (mod b) with 0 <= s < b, so x = s is the canonical
+    // coefficient and y = (r - a*s) / b is exact.
+    if s == 0 {
+        // a ≡ 0 (mod b) forces r = b: the certificate is a*0 + b*1 = b.
+        (r, 0, 1)
+    } else {
+        // a*s ≥ a ≥ r (r divides a, and a > 0 since s > 0), so the subtraction can't
+        // underflow; the product fits u128 because both factors are < 2^64.
+        let num = (a as u128) * (s as u128) - (r as u128);
+        (r, s as i128, -((num / (b as u128)) as i128))
+    }
+}
+
 /// Modular multiplicative inverse via the textbook [extended Euclidean
 /// algorithm](https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm), for signed types
 /// where the modulus may be negative. Returns the inverse of *a* mod *m* in the canonical range
@@ -514,6 +566,39 @@ mod tests {
         assert_eq!(modinverse(BigInt::from(3), BigInt::from(26)), Some(BigInt::from(9)));
         assert_eq!(modinverse(BigInt::from(3), BigInt::from(-26)), Some(BigInt::from(9)));
         assert_eq!(modinverse(BigInt::from(4), BigInt::from(32)), None);
+    }
+
+    #[test]
+    fn egcd_u64_bezout_exhaustive_small() {
+        // The full contract on a dense grid: g = gcd, exact Bézout identity, canonical x.
+        for a in 0u64..=80 {
+            for b in 0u64..=80 {
+                let (g, x, y) = egcd_u64(a, b);
+                let textbook_g = {
+                    let (gg, _, _) = egcd(a as i128, b as i128);
+                    gg as u64
+                };
+                assert_eq!(g, textbook_g, "gcd disagrees at ({a}, {b})");
+                assert_eq!(a as i128 * x + b as i128 * y, g as i128, "Bézout fails at ({a}, {b})");
+                if b > 0 {
+                    assert!(0 <= x && x < b as i128, "x not canonical at ({a}, {b})");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn egcd_u64_edges_and_large() {
+        assert_eq!(egcd_u64(0, 0), (0, 1, 0));
+        assert_eq!(egcd_u64(7, 0), (7, 1, 0));
+        assert_eq!(egcd_u64(0, 7), (7, 0, 1));
+        assert_eq!(egcd_u64(5, 1), (1, 0, 1));
+        // u64::MAX-adjacent inputs: the y intermediate exercises the full u128 widening.
+        let (a, b) = (u64::MAX, u64::MAX - 1);
+        let (g, x, y) = egcd_u64(a, b);
+        assert_eq!(g, 1);
+        assert_eq!(a as i128 * x + b as i128 * y, 1);
+        assert!(0 <= x && x < b as i128);
     }
 
     #[test]
