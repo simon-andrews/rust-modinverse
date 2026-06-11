@@ -28,7 +28,7 @@ private lemma numBits_le_64 : System.Platform.numBits ≤ 64 := by
 
 private lemma ucast_usize_val (a : Std.Usize) : (UScalar.cast .U64 a).val = a.val :=
   UScalar.cast_val_mod_pow_greater_numBits_eq .U64 a
-    (by simpa [Usize.numBits, U64.numBits] using numBits_le_64)
+    (by simp)
 
 private lemma cast_back_usize_val {s : Std.U64} (h : s.val < 2 ^ System.Platform.numBits) :
     (UScalar.cast .Usize s).val = s.val :=
@@ -63,7 +63,7 @@ theorem modinverse_usize_spec (a m : Std.Usize) :
 
 private lemma icast_isize_val (a : Std.Isize) : (IScalar.cast .I64 a).val = a.val :=
   IScalar.val_mod_pow_greater_numBits .I64 a
-    (by simpa [Isize.numBits, I64.numBits] using numBits_le_64)
+    (by simp)
 
 private lemma cast_back_isize_val {s : Std.I64} (h0 : 0 ≤ s.val)
     (h1 : s.val < 2 ^ (System.Platform.numBits - 1)) :
