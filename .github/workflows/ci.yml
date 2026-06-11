@@ -14,6 +14,25 @@ jobs:
       - run: just no-rogue-axioms
       - run: just trusted-unchanged
 
+  # The proof certifies extraction/Machine.lean; this job guarantees that file is
+  # actually what the current src/lib.rs extracts to. Charon and Aeneas come from
+  # the Aeneas flake at the same revision the lakefile pins for the Lean backend.
+  check-extraction:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: nix-community/cache-nix-action@v6
+        with:
+          primary-key: nix-${{ runner.os }}-aeneas-a2e779f00fc384c2f4d1131bbd573dc948ddf0d7
+      - uses: extractions/setup-just@v2
+      - name: Install Charon and Aeneas
+        run: >
+          nix profile install
+          github:AeneasVerif/aeneas/a2e779f00fc384c2f4d1131bbd573dc948ddf0d7#charon
+          github:AeneasVerif/aeneas/a2e779f00fc384c2f4d1131bbd573dc948ddf0d7#aeneas
+      - run: just extraction-current
+
   check-rust:
     runs-on: ubuntu-latest
     steps:

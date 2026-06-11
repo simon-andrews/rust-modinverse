@@ -30,6 +30,12 @@ extract:
     aeneas -backend lean -loops-to-rec -dest extraction modinverse.llbc || true
     mv extraction/Modinverse.lean extraction/Machine.lean
 
+# Fail if extraction/Machine.lean is stale with respect to src/lib.rs — i.e. the
+# committed extraction is not what `just extract` produces. Without this, a Rust
+# change without re-extraction would leave the proof certifying stale code.
+extraction-current: extract
+    git diff --exit-code extraction/
+
 # Fail if any sorry remains in the proof.
 no-sorry:
     ! grep -RnE '\bsorry\b' --include='*.lean' --exclude-dir=.lake proof/ | grep -vF '`sorry`'
