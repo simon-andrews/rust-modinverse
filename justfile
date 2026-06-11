@@ -9,6 +9,17 @@ check:
     cargo clippy --all-targets --all-features -- -D warnings
     cargo doc --no-deps --all-features
 
+# Benchmark the fixed-width inverses (the optimization loop's fitness function).
+# On macOS, libc in the criterion dep graph links -liconv, which a nix-provided
+# linker won't find without being pointed at the SDK's libraries.
+bench:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ "$(uname)" == "Darwin" ]] && command -v xcrun >/dev/null; then
+        export RUSTFLAGS="${RUSTFLAGS:-} -L $(xcrun --show-sdk-path)/usr/lib"
+    fi
+    cargo bench --bench modinverse
+
 # Build the Lean proof.
 prove-correctness:
     cd proof && lake build
