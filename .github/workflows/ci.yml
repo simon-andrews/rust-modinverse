@@ -27,10 +27,13 @@ jobs:
           primary-key: nix-${{ runner.os }}-aeneas-a2e779f00fc384c2f4d1131bbd573dc948ddf0d7
       - uses: extractions/setup-just@v2
       - name: Install Charon and Aeneas
-        run: >
-          nix profile install
-          github:AeneasVerif/aeneas/a2e779f00fc384c2f4d1131bbd573dc948ddf0d7#charon
-          github:AeneasVerif/aeneas/a2e779f00fc384c2f4d1131bbd573dc948ddf0d7#aeneas
+        # Charon and Aeneas come from the same flake and share a conflicting file,
+        # so installing both in one `nix profile install` aborts on the collision.
+        # Install separately and give Aeneas a higher precedence (lower number) so
+        # the shared file resolves to its copy instead of failing.
+        run: |
+          nix profile install github:AeneasVerif/aeneas/a2e779f00fc384c2f4d1131bbd573dc948ddf0d7#charon
+          nix profile install github:AeneasVerif/aeneas/a2e779f00fc384c2f4d1131bbd573dc948ddf0d7#aeneas --priority 4
       - run: just extraction-current
 
   check-rust:
